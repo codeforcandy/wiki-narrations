@@ -1,0 +1,963 @@
+<!doctype html>
+<!--
+  KB Narration: AutoResearch & Autonomous Agent Loops
+  Source: report/autoresearch-and-autonomous-loops.md
+  Forked from: references/template.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AutoResearch & Autonomous Loops · KB Narration</title>
+<meta name="description" content="One GPU, one prompt file, one overnight loop — the pattern that earned 42,000 stars and generalizes to everything.">
+<script src="https://unpkg.com/d3@7/dist/d3.min.js" defer></script>
+<style>
+:root {
+  --bg:        oklch(0.16 0.010 260);
+  --bg-elev:   oklch(0.21 0.012 260);
+  --bg-hi:     oklch(0.26 0.014 260);
+  --fg:        oklch(0.95 0.004 260);
+  --fg-mid:    oklch(0.78 0.007 260);
+  --fg-dim:    oklch(0.55 0.010 260);
+  --border:    oklch(0.32 0.012 260);
+  --accent:    oklch(0.80 0.16 65);
+  --cool:      oklch(0.76 0.13 200);
+  --grow:      oklch(0.80 0.17 148);
+  --fade:      oklch(0.70 0.16 35);
+  --stop:      oklch(0.55 0.010 260);
+  --shadow:    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.25);
+}
+[data-theme="light"] {
+  --bg:      oklch(0.985 0.004 260);
+  --bg-elev: oklch(0.965 0.006 260);
+  --bg-hi:   oklch(0.92 0.008 260);
+  --fg:      oklch(0.22 0.012 260);
+  --fg-mid:  oklch(0.40 0.010 260);
+  --fg-dim:  oklch(0.55 0.010 260);
+  --border:  oklch(0.82 0.006 260);
+  --accent:  oklch(0.62 0.17 55);
+  --cool:    oklch(0.55 0.13 215);
+  --grow:    oklch(0.55 0.16 148);
+  --fade:    oklch(0.58 0.17 32);
+  --stop:    oklch(0.60 0.010 260);
+  --shadow:  0 1px 0 oklch(1 0 0 / 0.8) inset, 0 6px 18px oklch(0 0 0 / 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+html { scroll-behavior: smooth; }
+body {
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+h1, h2, h3 {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; line-height: 1.15; letter-spacing: -0.015em;
+  margin: 0 0 0.4em;
+}
+h1 { font-size: clamp(2.2rem, 5.5vw, 4rem); }
+h2 { font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin-top: 0.2em; }
+h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.5em; color: var(--fg-mid); }
+p { margin: 0 0 1em; color: var(--fg-mid); }
+p.lede { font-size: 1.15rem; color: var(--fg); max-width: 62ch; }
+em { color: var(--fg); font-style: italic; }
+strong { color: var(--fg); font-weight: 600; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid oklch(from var(--accent) l c h / 0.4); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+main { max-width: 980px; margin: 0 auto; padding: 4rem 1.5rem 6rem; position: relative; }
+section { margin: 4.5rem 0; opacity: 0; transform: translateY(20px); transition: opacity 0.9s ease-out, transform 0.9s ease-out; }
+section.visible { opacity: 1; transform: none; }
+section:first-of-type { margin-top: 2rem; }
+
+#progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cool));
+  width: 0%; z-index: 100;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 12px var(--accent);
+}
+
+#theme-toggle {
+  position: fixed; top: 1.2rem; right: 1.2rem;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-elev); color: var(--fg);
+  border: 1px solid var(--border);
+  font: 16px/1 system-ui; cursor: pointer;
+  z-index: 60; display: grid; place-items: center;
+  transition: background 0.2s, transform 0.2s;
+}
+#theme-toggle:hover { background: var(--bg-hi); transform: rotate(20deg); }
+#theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+#minimap {
+  position: fixed;
+  left: max(1.2rem, calc(50vw - 620px));
+  top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0.6rem;
+  z-index: 50; padding: 0.6rem 0;
+}
+#minimap a {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--fg-dim); border: none;
+  font-size: 0.78rem; font-family: -apple-system, system-ui, sans-serif;
+  border-radius: 4px; transition: color 0.2s; white-space: nowrap;
+}
+#minimap a::before {
+  content: ""; display: inline-block;
+  width: 16px; height: 2px; background: var(--border);
+  transition: width 0.3s, background 0.3s;
+}
+#minimap a:hover { color: var(--fg); }
+#minimap a.active { color: var(--accent); }
+#minimap a.active::before { width: 28px; background: var(--accent); }
+@media (max-width: 1200px) { #minimap { display: none; } }
+
+.hero { padding: 2rem 0 1rem; }
+.hero .date {
+  display: inline-block;
+  font: 600 0.72rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 0.4rem 0.7rem;
+  border: 1px solid oklch(from var(--accent) l c h / 0.4);
+  border-radius: 100px; margin-bottom: 1.6rem;
+}
+.hero h1 { max-width: 18ch; }
+.hero .subtitle {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-style: italic; font-size: 1.25rem;
+  color: var(--fg-mid); max-width: 55ch;
+  margin: -0.2em 0 2rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem; margin: 2rem 0 1rem;
+}
+.stat {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1.2rem 1.3rem;
+  box-shadow: var(--shadow); transition: transform 0.3s, border-color 0.3s;
+}
+.stat:hover { transform: translateY(-2px); border-color: var(--accent); }
+.stat .value {
+  display: block;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; font-size: 2.6rem; line-height: 1;
+  letter-spacing: -0.03em; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.stat .label { display: block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--fg-dim); line-height: 1.4; }
+.stat.accent .value { color: var(--accent); }
+.stat.cool   .value { color: var(--cool); }
+.stat.grow   .value { color: var(--grow); }
+.stat.fade   .value { color: var(--fade); }
+
+.pullquote {
+  margin: 3rem 0; padding: 1.8rem 2rem 1.8rem 2.3rem;
+  background: linear-gradient(135deg, oklch(from var(--accent) l c h / 0.08), oklch(from var(--accent) l c h / 0.02));
+  border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+}
+.pullquote p { font-size: 1.4rem; line-height: 1.35; margin: 0; color: var(--fg); font-style: italic; }
+.pullquote cite {
+  display: block; margin-top: 0.9rem;
+  font-style: normal; font-size: 0.82rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--fg-dim); font-family: -apple-system, system-ui, sans-serif;
+}
+
+.viz {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;
+  box-shadow: var(--shadow);
+}
+.viz svg { display: block; width: 100%; height: auto; overflow: visible; }
+.viz .caption { font-size: 0.82rem; color: var(--fg-dim); margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+
+.domain-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem; margin: 1.5rem 0;
+}
+.domain-card {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1.3rem; box-shadow: var(--shadow);
+  opacity: 0; transform: translateY(16px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out, border-color 0.3s;
+}
+.domain-card.visible { opacity: 1; transform: none; }
+.domain-card:hover { border-color: var(--accent); }
+.domain-card .domain-name {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; font-size: 1.1rem; color: var(--fg); margin: 0 0 0.3em;
+}
+.domain-card .scoring { font-size: 0.82rem; color: var(--accent); margin: 0 0 0.5em;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace; }
+.domain-card .result { font-size: 0.88rem; color: var(--fg-mid); margin: 0 0 0.3em; }
+.domain-card .engagement { font-size: 0.78rem; color: var(--fg-dim); margin: 0; }
+
+.convergence-wrap { display: flex; justify-content: center; margin: 2rem 0; }
+
+.actions {
+  display: grid; grid-template-columns: 1.1fr 0.85fr 0.85fr; gap: 1rem; margin-top: 2rem;
+}
+@media (max-width: 820px) { .actions { grid-template-columns: 1fr; } }
+.col {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-top-width: 3px; border-radius: 10px;
+  padding: 1.3rem; box-shadow: var(--shadow);
+}
+.col.immediate { border-top-color: var(--accent); }
+.col.watch { border-top-color: var(--cool); }
+.col.skip { border-top-color: var(--stop); }
+.col h3 {
+  margin: 0 0 1rem;
+  font: 600 0.72rem/1 -apple-system, system-ui, sans-serif;
+  letter-spacing: 0.13em; text-transform: uppercase; color: var(--fg-dim);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.col.immediate h3 { color: var(--accent); }
+.col.watch h3 { color: var(--cool); }
+.col.skip h3 { color: var(--stop); }
+.col h3::before {
+  content: ""; display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 0 3px oklch(from currentColor l c h / 0.18);
+}
+.card { padding: 0.85rem 0; border-bottom: 1px solid var(--border); }
+.card:last-child { border-bottom: none; padding-bottom: 0; }
+.card .title { font-size: 0.92rem; color: var(--fg); font-weight: 500; line-height: 1.35; margin-bottom: 0.25rem; }
+.card .why { font-size: 0.8rem; color: var(--fg-dim); line-height: 1.45; }
+
+.hero-stat-click {
+  cursor: pointer; transition: opacity 0.2s;
+}
+.hero-stat-click:hover { opacity: 0.8; }
+
+@keyframes pulse-glow {
+  0%, 100% { r: 18; opacity: 0.6; }
+  50% { r: 24; opacity: 1; }
+}
+
+.kbd {
+  display: inline-block; padding: 0.1em 0.45em;
+  background: var(--bg-hi); border: 1px solid var(--border);
+  border-bottom-width: 2px; border-radius: 4px;
+  font: 600 0.72em/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--fg-mid);
+}
+
+footer {
+  margin-top: 6rem; padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim); font-size: 0.8rem; text-align: center;
+}
+footer a { color: var(--fg-dim); border-bottom-color: var(--border); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  section { opacity: 1; transform: none; }
+  .domain-card { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<button id="theme-toggle" aria-label="Toggle theme" title="Toggle light / dark">&#9790;</button>
+
+<nav id="minimap" aria-label="Section navigation">
+  <a href="#top">Top</a>
+  <a href="#loop">The Loop</a>
+  <a href="#domains">Domains</a>
+  <a href="#sources">Sources</a>
+  <a href="#convergence">Convergence</a>
+  <a href="#whats-next">What's Next</a>
+</nav>
+
+<main id="top">
+
+  <!-- HERO -->
+  <header class="hero">
+    <span class="date">April 2026</span>
+    <h1>42,000 Stars in One Week</h1>
+    <p class="subtitle">One GPU, one prompt file, one overnight loop can do the work of a research team — and the pattern generalizes to everything.</p>
+    <div class="viz">
+      <svg id="hero-viz" viewBox="0 0 900 420" aria-label="Star explosion visualization showing 42,000 GitHub stars and $25 per 100 experiments leverage"></svg>
+      <div class="caption">Click the star count to trigger a mini AutoResearch simulation. Each particle represents a cluster of GitHub stars.</div>
+    </div>
+    <p class="lede">In March 2026, Andrej Karpathy open-sourced AutoResearch — a framework for running autonomous ML experiments overnight. The system is deceptively simple: one file, <code>program.md</code>, defines the experiment template and evaluation criteria. Launch the agent loop. Come back to 100 ranked results. The cost: $25 and a single GPU. Fortune called it "The Karpathy Loop."</p>
+  </header>
+
+  <!-- PULL QUOTE 1 -->
+  <div class="pullquote">
+    <p>"All of them were additive and transferred to larger models."</p>
+    <cite>— Andrej Karpathy, 19,424 likes</cite>
+  </div>
+
+  <!-- THE LOOP -->
+  <section id="loop">
+    <h2>The Loop</h2>
+    <p>Everything flows from one file. The <code>program.md</code> defines what to experiment with, how to evaluate, and when to stop. The rest is a thin harness — ~630 lines — that loops, measures, and logs. The intellectual contribution is the meta-prompt. The architecture is the iteration.</p>
+    <div class="viz">
+      <svg id="loop-viz" viewBox="0 0 900 500" aria-label="Animated loop diagram showing the AutoResearch cycle: program.md, Agent, Experiment, Evaluate, Log"></svg>
+      <div class="caption">The five-step loop animates continuously. The iteration counter in the center ticks up with each cycle.</div>
+    </div>
+    <p>The critical constraint: AutoResearch requires a <strong>numeric score</strong> to optimize against. Without one, the loop cannot rank, cannot improve, cannot converge. This is the boundary that defines where the pattern works out of the box — and where it needs adaptation.</p>
+  </section>
+
+  <!-- PULL QUOTE 2 -->
+  <div class="pullquote">
+    <p>"Imagine running 700x more experiments: landing pages, creatives, AEO/SEO, pricing, emails, cold outreach, warm outreach, AP/AR, procurement."</p>
+    <cite>— ericosiu, 1,596 likes</cite>
+  </div>
+
+  <!-- DOMAINS -->
+  <section id="domains">
+    <h2>Where the Loop Generalizes</h2>
+    <p>The most under-appreciated insight: AutoResearch is a template for <em>any</em> iterative optimization problem, not just ML. The core architecture — meta-prompt, agent loop, structured evaluation — is domain-agnostic. Only the scoring function changes.</p>
+    <div class="domain-grid" id="domain-cards">
+      <!-- Cards rendered in HTML for no-JS readability -->
+      <div class="domain-card">
+        <div class="domain-name">Machine Learning</div>
+        <div class="scoring">score: validation_loss</div>
+        <div class="result">~20 improvements found in 2 days on nanochat</div>
+        <div class="engagement">42,000 stars / 28,273 likes</div>
+      </div>
+      <div class="domain-card">
+        <div class="domain-name">Quantitative Finance</div>
+        <div class="scoring">score: sharpe_ratio</div>
+        <div class="result">135 autonomous iterations via Autoquant</div>
+        <div class="engagement">1,936 likes (varun_mathur)</div>
+      </div>
+      <div class="domain-card">
+        <div class="domain-name">Marketing &amp; Copy</div>
+        <div class="scoring">score: adversarial_debate</div>
+        <div class="result">Pass rate 56% &rarr; 92% overnight</div>
+        <div class="engagement">1,406 likes (AutoReason)</div>
+      </div>
+      <div class="domain-card">
+        <div class="domain-name">Academic Research</div>
+        <div class="scoring">score: citation_coverage</div>
+        <div class="result">Cited meta-analysis in 30 minutes (Feynman)</div>
+        <div class="engagement">4,895 likes (advaitpaliwal)</div>
+      </div>
+      <div class="domain-card">
+        <div class="domain-name">Production Engineering</div>
+        <div class="scoring">score: test_coverage</div>
+        <div class="result">16.5 hrs, 185 agent runs, 89% coverage</div>
+        <div class="engagement">Factory.ai missions</div>
+      </div>
+      <div class="domain-card">
+        <div class="domain-name">Distributed Compute</div>
+        <div class="scoring">score: pooled_gpu_cycles</div>
+        <div class="result">SETI@home for AI — 1000x experiments at same cost</div>
+        <div class="engagement">7,592 likes (Karpathy/NoPriors)</div>
+      </div>
+    </div>
+    <p>Each application inherits the core architecture and adapts the evaluation function. AutoReason replaced the numeric score with an adversarial agent debate — one proposes, another critiques, loop until the critiquing agent runs out of objections. The qualitative gap is the frontier.</p>
+  </section>
+
+  <!-- SOURCES -->
+  <section id="sources">
+    <h2>Source Engagement</h2>
+    <p>Fifteen sources, four categories. The engagement range spans two orders of magnitude — from Voxyz's 232-like warning about silent cron failure to Karpathy's 28,273-like launch post. Log scale tells the true story.</p>
+    <div class="viz">
+      <svg id="sources-viz" viewBox="0 0 900 560" aria-label="Horizontal bar chart of source engagement by likes, log scale"></svg>
+      <div class="caption">Bars colored by category: amber = core Karpathy, teal = variants/applications, green = infrastructure, rust = hard problems.</div>
+    </div>
+  </section>
+
+  <!-- PULL QUOTE 3 -->
+  <div class="pullquote">
+    <p>"Sadly, the agents do not want to loop forever."</p>
+    <cite>— Andrej Karpathy, 1,509 likes</cite>
+  </div>
+
+  <!-- CONVERGENCE -->
+  <section id="convergence">
+    <h2>The Convergence</h2>
+    <p>AutoResearch is not a tool. It is a pattern. And the pattern converges on three points: always-on optimization via <code>/loop</code>, distributed compute via pooled GPUs, and recursive self-improvement where the loop turns inward. An agent that runs AutoResearch on its own performance — measuring output quality, proposing improvements to its own skills, evaluating, iterating.</p>
+    <div class="viz">
+      <svg id="convergence-viz" viewBox="0 0 900 400" aria-label="Three arrows converging: /loop, distributed compute, self-improvement"></svg>
+      <div class="caption">Three convergence points: /loop (always-on), distributed compute (SETI@home for AI), self-improvement (recursive agent optimization).</div>
+    </div>
+    <p>Berkeley's result: told a coding agent to cut its own cost and runtime by 99%. It ran overnight, watching its own logs, editing its own code, rerunning. Result: <strong>98% cost cut, 75% faster.</strong> The LEARN phase becomes continuous, not manual.</p>
+  </section>
+
+  <!-- WHAT'S NEXT -->
+  <section id="whats-next">
+    <h2>What's Next</h2>
+    <p>The overnight experiment run becomes a standard part of the SDLC. The coordination layer for distributed compute is the missing piece. The loop that improves things eventually turns inward.</p>
+    <div class="actions">
+      <div class="col immediate">
+        <h3>Build Now</h3>
+        <div class="card">
+          <div class="title">Write your program.md</div>
+          <div class="why">The meta-prompt is the entire intellectual contribution. Define your experiment template, evaluation criteria, and stopping condition.</div>
+        </div>
+        <div class="card">
+          <div class="title">Add a bash pre-check gate</div>
+          <div class="why">Elvis Sun burned 24M+ Opus tokens/day polling idle agents. A zero-token bash check before invoking the model cuts ~95% of waste.</div>
+        </div>
+      </div>
+      <div class="col watch">
+        <h3>Watch</h3>
+        <div class="card">
+          <div class="title">SETI@home for AI</div>
+          <div class="why">Karpathy named it explicitly. The economics are compelling; the coordination layer is what's missing.</div>
+        </div>
+        <div class="card">
+          <div class="title">TinyLab + Apple Silicon clusters</div>
+          <div class="why">Control plane for Mac clusters — launch, crash-recover, evaluate, promote winners, kill losers.</div>
+        </div>
+      </div>
+      <div class="col skip">
+        <h3>Avoid</h3>
+        <div class="card">
+          <div class="title">Naive cron polling</div>
+          <div class="why">Cron is the quietest failure point. No errors, no alerts. Your briefing stopped two days ago and nobody noticed.</div>
+        </div>
+        <div class="card">
+          <div class="title">Loops without watchdogs</div>
+          <div class="why">Run a dedicated Opus watchdog agent on cron to check on other agents every 30 minutes. All problems went away.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Narration of <a href="../report/autoresearch-and-autonomous-loops.md">autoresearch-and-autonomous-loops.md</a>
+      · rendered by <code>/kb-narration</code> · d3 v7<br>
+      Use <span class="kbd">j</span> <span class="kbd">k</span> or <span class="kbd">&#8595;</span> <span class="kbd">&#8593;</span> to move between sections.
+    </p>
+  </footer>
+</main>
+
+<script>
+const DATA = {
+  sources: [
+    { id: 'Karpathy — Launch', likes: 28273, cat: 'core' },
+    { id: 'Karpathy — Proof', likes: 19424, cat: 'core' },
+    { id: 'Karpathy/NoPriors — SETI', likes: 7592, cat: 'core' },
+    { id: 'Feynman (advaitpaliwal)', likes: 4895, cat: 'variant' },
+    { id: 'Karpathy — Code Quality', likes: 4297, cat: 'core' },
+    { id: 'Elvis Sun — Token Waste', likes: 2149, cat: 'infra' },
+    { id: 'Autoquant (varun_mathur)', likes: 1936, cat: 'variant' },
+    { id: 'Self-Improving Skills', likes: 1828, cat: 'variant' },
+    { id: 'ericosiu — 700x Experiments', likes: 1596, cat: 'variant' },
+    { id: 'Karpathy — Agents Resist', likes: 1509, cat: 'problem' },
+    { id: 'AutoReason (Shann)', likes: 1406, cat: 'variant' },
+    { id: 'Berkeley — 98% Cost Cut', likes: 1124, cat: 'variant' },
+    { id: 'Yam Peleg — Watchdog', likes: 1054, cat: 'infra' },
+    { id: 'TinyLab (Trevin Peterson)', likes: 800, cat: 'infra' },
+    { id: 'Voxyz — Silent Cron', likes: 232, cat: 'problem' }
+  ],
+  catColors: { core: '--accent', variant: '--cool', infra: '--grow', problem: '--fade' },
+  loopSteps: ['program.md', 'Agent', 'Experiment', 'Evaluate', 'Log']
+};
+
+/* ── HERO VIZ ─────────────────────────────────────────── */
+function drawHero() {
+  const svg = d3.select('#hero-viz');
+  svg.selectAll('*').remove();
+  const vb = svg.node().viewBox.baseVal;
+  const W = vb.width, H = vb.height;
+
+  // Particles
+  const N = 150;
+  const nodes = d3.range(N).map(i => ({
+    id: i,
+    x: W * 0.35 + (Math.random() - 0.5) * 60,
+    y: H * 0.4 + (Math.random() - 0.5) * 60
+  }));
+
+  const g = svg.append('g');
+
+  // Particles start clustered, then burst
+  const circles = g.selectAll('circle').data(nodes).join('circle')
+    .attr('cx', d => d.x).attr('cy', d => d.y)
+    .attr('r', 3.5)
+    .attr('fill', 'var(--accent)')
+    .attr('opacity', 0);
+
+  circles.transition().delay((_, i) => 200 + i * 12).duration(400)
+    .attr('opacity', 0.7);
+
+  // After appearing, burst outward then re-cluster
+  setTimeout(() => {
+    const sim = d3.forceSimulation(nodes)
+      .force('x', d3.forceX(W * 0.35).strength(0.03))
+      .force('y', d3.forceY(H * 0.45).strength(0.03))
+      .force('collide', d3.forceCollide(6))
+      .force('charge', d3.forceManyBody().strength(-8))
+      .alphaDecay(0.02)
+      .on('tick', () => circles.attr('cx', d => d.x).attr('cy', d => d.y));
+
+    // Brief burst
+    setTimeout(() => {
+      sim.force('charge', d3.forceManyBody().strength(-0.5));
+      sim.force('x').strength(0.06);
+      sim.force('y').strength(0.06);
+      sim.alpha(0.5).restart();
+    }, 800);
+  }, 200 + N * 12 + 300);
+
+  // Hero number
+  const heroText = svg.append('text')
+    .attr('x', W * 0.7).attr('y', H * 0.38)
+    .attr('text-anchor', 'middle')
+    .attr('font-family', '"Source Serif 4", "Iowan Old Style", Charter, Georgia, serif')
+    .attr('font-size', 64).attr('font-weight', 700)
+    .attr('fill', 'var(--accent)')
+    .attr('font-variant-numeric', 'tabular-nums')
+    .attr('class', 'hero-stat-click')
+    .attr('role', 'button')
+    .attr('tabindex', 0)
+    .text('42,000');
+
+  svg.append('text')
+    .attr('x', W * 0.7).attr('y', H * 0.38 + 30)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', 14).attr('fill', 'var(--fg-dim)')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('GitHub stars in one week');
+
+  // Leverage scale
+  const scaleY = H * 0.72;
+  const scaleG = svg.append('g').attr('transform', 'translate(0,' + scaleY + ')');
+
+  // $25 input
+  const inputW = 60, outputW = 400;
+  const startX = W * 0.5 - (inputW + outputW + 40) / 2;
+
+  scaleG.append('rect').attr('x', startX).attr('y', -12).attr('width', 0).attr('height', 24)
+    .attr('rx', 4).attr('fill', 'var(--fg-dim)').attr('fill-opacity', 0.2)
+    .attr('stroke', 'var(--fg-dim)')
+    .transition().delay(1800).duration(600).attr('width', inputW);
+  scaleG.append('text').attr('x', startX + inputW / 2).attr('y', 5)
+    .attr('text-anchor', 'middle').attr('font-size', 13).attr('fill', 'var(--fg-dim)')
+    .attr('font-weight', 600).attr('opacity', 0).text('$25')
+    .transition().delay(2000).duration(400).attr('opacity', 1);
+
+  // Arrow
+  scaleG.append('text').attr('x', startX + inputW + 20).attr('y', 6)
+    .attr('text-anchor', 'middle').attr('font-size', 18).attr('fill', 'var(--fg-dim)')
+    .attr('opacity', 0).text('\u2192')
+    .transition().delay(2200).duration(300).attr('opacity', 1);
+
+  // 100 experiments output
+  const outX = startX + inputW + 40;
+  scaleG.append('rect').attr('x', outX).attr('y', -12).attr('width', 0).attr('height', 24)
+    .attr('rx', 4).attr('fill', 'var(--accent)').attr('fill-opacity', 0.15)
+    .attr('stroke', 'var(--accent)')
+    .transition().delay(2400).duration(700).attr('width', outputW);
+  scaleG.append('text').attr('x', outX + outputW / 2).attr('y', 5)
+    .attr('text-anchor', 'middle').attr('font-size', 13).attr('fill', 'var(--accent)')
+    .attr('font-weight', 600).attr('opacity', 0).text('100 experiments')
+    .transition().delay(2800).duration(400).attr('opacity', 1);
+
+  // Pay-off: click triggers mini simulation
+  heroText.on('click', runMiniSimulation);
+}
+
+function runMiniSimulation() {
+  const loopSvg = d3.select('#loop-viz');
+  if (loopSvg.empty()) return;
+
+  // Scroll to loop section
+  document.getElementById('loop').scrollIntoView({ behavior: 'smooth' });
+
+  // Ensure loop is drawn
+  if (!vizDrawnOnce.has('loop')) { drawLoop(); vizDrawnOnce.add('loop'); }
+
+  // Rapid 10-iteration simulation
+  let iter = 0;
+  let loss = 2.847;
+  const counterEl = loopSvg.select('.loop-counter');
+  const lossEl = loopSvg.select('.loop-loss');
+  const stepHighlights = loopSvg.selectAll('.step-node');
+  const totalSteps = DATA.loopSteps.length;
+
+  const interval = setInterval(() => {
+    const stepIdx = iter % totalSteps;
+
+    // Highlight current step
+    stepHighlights.attr('stroke-width', (_, i) => i === stepIdx ? 3 : 1.5)
+      .attr('r', (_, i) => i === stepIdx ? 28 : 24);
+
+    if (stepIdx === totalSteps - 1) {
+      loss = Math.max(0.412, loss - (0.15 + Math.random() * 0.12));
+      if (counterEl.size()) counterEl.text(Math.floor(iter / totalSteps) + 1);
+      if (lossEl.size()) lossEl.text('loss: ' + loss.toFixed(3));
+    }
+
+    iter++;
+    if (iter >= totalSteps * 10) {
+      clearInterval(interval);
+      stepHighlights.attr('stroke-width', 1.5).attr('r', 24);
+    }
+  }, 150);
+}
+
+/* ── LOOP VIZ ─────────────────────────────────────────── */
+function drawLoop() {
+  const svg = d3.select('#loop-viz');
+  svg.selectAll('*').remove();
+  const vb = svg.node().viewBox.baseVal;
+  const W = vb.width, H = vb.height;
+  const cx = W / 2, cy = H / 2, R = 160;
+
+  const steps = DATA.loopSteps;
+  const n = steps.length;
+  const angleOffset = -Math.PI / 2;
+  const pts = steps.map((s, i) => {
+    const a = angleOffset + (2 * Math.PI * i) / n;
+    return { label: s, x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), angle: a };
+  });
+
+  const g = svg.append('g');
+
+  // Arcs between nodes
+  pts.forEach((p, i) => {
+    const next = pts[(i + 1) % n];
+    const midX = (p.x + next.x) / 2 + (cy - (p.y + next.y) / 2) * 0.2;
+    const midY = (p.y + next.y) / 2 + ((p.x + next.x) / 2 - cx) * 0.2;
+    g.append('path')
+      .attr('d', 'M' + p.x + ',' + p.y + ' Q' + midX + ',' + midY + ' ' + next.x + ',' + next.y)
+      .attr('fill', 'none').attr('stroke', 'var(--border)').attr('stroke-width', 1.5)
+      .attr('opacity', 0)
+      .transition().delay(300 + i * 120).duration(500).attr('opacity', 0.6);
+  });
+
+  // Arrow heads on arcs
+  svg.append('defs').append('marker')
+    .attr('id', 'arrow').attr('viewBox', '0 0 10 10')
+    .attr('refX', 5).attr('refY', 5)
+    .attr('markerWidth', 6).attr('markerHeight', 6)
+    .attr('orient', 'auto-start-reverse')
+    .append('path').attr('d', 'M 0 0 L 10 5 L 0 10 z').attr('fill', 'var(--border)');
+
+  // Step nodes
+  const nodeG = g.selectAll('g.step').data(pts).join('g')
+    .attr('class', 'step')
+    .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+  nodeG.append('circle')
+    .attr('class', 'step-node')
+    .attr('r', 0).attr('fill', 'var(--bg-elev)')
+    .attr('stroke', 'var(--accent)').attr('stroke-width', 1.5)
+    .transition().delay((_, i) => 200 + i * 120).duration(500)
+    .attr('r', 24);
+
+  nodeG.append('text')
+    .attr('text-anchor', 'middle').attr('dy', '0.35em')
+    .attr('font-size', 11).attr('fill', 'var(--fg)')
+    .attr('font-family', '"JetBrains Mono", "SF Mono", ui-monospace, monospace')
+    .attr('opacity', 0)
+    .text(d => d.label.length > 10 ? d.label.slice(0, 9) + '..' : d.label)
+    .transition().delay((_, i) => 400 + i * 120).duration(400).attr('opacity', 1);
+
+  // Outer labels
+  nodeG.append('text')
+    .attr('x', d => Math.cos(d.angle) * 44)
+    .attr('y', d => Math.sin(d.angle) * 44)
+    .attr('text-anchor', 'middle').attr('dy', '0.35em')
+    .attr('font-size', 12).attr('fill', 'var(--fg-mid)')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .attr('opacity', 0)
+    .text(d => d.label)
+    .transition().delay((_, i) => 600 + i * 120).duration(400).attr('opacity', 1);
+
+  // Center counter
+  svg.append('text').attr('class', 'loop-counter')
+    .attr('x', cx).attr('y', cy - 8)
+    .attr('text-anchor', 'middle')
+    .attr('font-family', '"Source Serif 4", "Iowan Old Style", Charter, Georgia, serif')
+    .attr('font-size', 36).attr('font-weight', 700)
+    .attr('fill', 'var(--accent)')
+    .attr('font-variant-numeric', 'tabular-nums')
+    .text('0');
+
+  svg.append('text').attr('class', 'loop-loss')
+    .attr('x', cx).attr('y', cy + 24)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', 13).attr('fill', 'var(--fg-dim)')
+    .attr('font-family', '"JetBrains Mono", "SF Mono", ui-monospace, monospace')
+    .text('loss: 2.847');
+
+  // Ambient animation — highlight cycles
+  let step = 0;
+  const ambientInterval = setInterval(() => {
+    const nodes = svg.selectAll('.step-node');
+    nodes.attr('stroke', (_, i) => i === step % n ? 'var(--accent)' : 'var(--border)')
+      .attr('fill-opacity', (_, i) => i === step % n ? 0.15 : 0);
+    step++;
+    if (step > 200) clearInterval(ambientInterval); // Don't run forever
+  }, 1200);
+}
+
+/* ── SOURCES BAR CHART ────────────────────────────────── */
+function drawSources() {
+  const svg = d3.select('#sources-viz');
+  svg.selectAll('*').remove();
+  const vb = svg.node().viewBox.baseVal;
+  const W = vb.width, H = vb.height;
+  const margin = { top: 20, right: 80, bottom: 40, left: 220 };
+  const iw = W - margin.left - margin.right;
+  const ih = H - margin.top - margin.bottom;
+
+  const data = DATA.sources;
+  const g = svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+  const x = d3.scaleLog().domain([200, 35000]).range([0, iw]);
+  const y = d3.scaleBand().domain(data.map(d => d.id)).range([0, ih]).padding(0.22);
+
+  const colorMap = {
+    core: 'var(--accent)',
+    variant: 'var(--cool)',
+    infra: 'var(--grow)',
+    problem: 'var(--fade)'
+  };
+
+  // Grid lines
+  const ticks = [500, 1000, 5000, 10000, 25000];
+  g.selectAll('line.grid').data(ticks).join('line')
+    .attr('x1', d => x(d)).attr('x2', d => x(d))
+    .attr('y1', 0).attr('y2', ih)
+    .attr('stroke', 'var(--border)').attr('stroke-dasharray', '3,3').attr('opacity', 0.5);
+
+  // Axis labels
+  g.selectAll('text.tick').data(ticks).join('text')
+    .attr('x', d => x(d)).attr('y', ih + 20)
+    .attr('text-anchor', 'middle').attr('font-size', 11)
+    .attr('fill', 'var(--fg-dim)')
+    .attr('font-family', '"JetBrains Mono", "SF Mono", ui-monospace, monospace')
+    .text(d => d >= 1000 ? (d / 1000) + 'k' : d);
+
+  // Bars
+  g.selectAll('rect.bar').data(data).join('rect')
+    .attr('class', 'bar')
+    .attr('x', 0).attr('y', d => y(d.id))
+    .attr('height', y.bandwidth())
+    .attr('width', 0)
+    .attr('fill', d => colorMap[d.cat])
+    .attr('fill-opacity', 0.2)
+    .attr('stroke', d => colorMap[d.cat])
+    .attr('rx', 3)
+    .transition().delay((_, i) => 80 * i).duration(700)
+    .attr('width', d => x(Math.max(200, d.likes)));
+
+  // Labels left
+  g.selectAll('text.label').data(data).join('text')
+    .attr('x', -8).attr('y', d => y(d.id) + y.bandwidth() / 2)
+    .attr('dy', '0.35em').attr('text-anchor', 'end')
+    .attr('font-size', 11).attr('fill', 'var(--fg-mid)')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text(d => d.id);
+
+  // Values right
+  g.selectAll('text.val').data(data).join('text')
+    .attr('x', d => x(Math.max(200, d.likes)) + 6)
+    .attr('y', d => y(d.id) + y.bandwidth() / 2)
+    .attr('dy', '0.35em').attr('text-anchor', 'start')
+    .attr('font-size', 11).attr('fill', d => colorMap[d.cat])
+    .attr('font-family', '"JetBrains Mono", "SF Mono", ui-monospace, monospace')
+    .attr('font-variant-numeric', 'tabular-nums')
+    .attr('opacity', 0)
+    .text(d => d.likes.toLocaleString())
+    .transition().delay((_, i) => 80 * i + 700).duration(300).attr('opacity', 1);
+}
+
+/* ── CONVERGENCE VIZ ──────────────────────────────────── */
+function drawConvergence() {
+  const svg = d3.select('#convergence-viz');
+  svg.selectAll('*').remove();
+  const vb = svg.node().viewBox.baseVal;
+  const W = vb.width, H = vb.height;
+  const cx = W / 2, cy = H / 2;
+
+  const arms = [
+    { label: '/loop', sublabel: 'Always-on optimization', x: cx - 280, y: cy, color: 'var(--accent)' },
+    { label: 'Distributed Compute', sublabel: 'SETI@home for AI', x: cx + 280, y: cy, color: 'var(--cool)' },
+    { label: 'Self-Improvement', sublabel: 'Recursive agent optimization', x: cx, y: cy - 160, color: 'var(--grow)' }
+  ];
+
+  const g = svg.append('g');
+
+  // Arrows to center
+  arms.forEach((arm, i) => {
+    g.append('line')
+      .attr('x1', arm.x).attr('y1', arm.y)
+      .attr('x2', arm.x).attr('y2', arm.y)
+      .attr('stroke', arm.color).attr('stroke-width', 2).attr('opacity', 0.6)
+      .transition().delay(400 + i * 200).duration(800)
+      .attr('x2', cx).attr('y2', cy);
+
+    // Arrowhead circle at tip
+    g.append('circle')
+      .attr('cx', arm.x).attr('cy', arm.y)
+      .attr('r', 5).attr('fill', arm.color).attr('opacity', 0)
+      .transition().delay(400 + i * 200).duration(300).attr('opacity', 0.8);
+  });
+
+  // Labels
+  arms.forEach((arm, i) => {
+    const isTop = arm.y < cy;
+    const labelG = g.append('g').attr('opacity', 0)
+      .transition().delay(300 + i * 200).duration(500).attr('opacity', 1);
+
+    g.append('text')
+      .attr('x', arm.x).attr('y', isTop ? arm.y - 24 : arm.y - 12)
+      .attr('text-anchor', 'middle')
+      .attr('font-family', '"Source Serif 4", "Iowan Old Style", Charter, Georgia, serif')
+      .attr('font-size', 18).attr('font-weight', 600)
+      .attr('fill', arm.color)
+      .attr('opacity', 0)
+      .text(arm.label)
+      .transition().delay(300 + i * 200).duration(500).attr('opacity', 1);
+
+    g.append('text')
+      .attr('x', arm.x).attr('y', isTop ? arm.y - 4 : arm.y + 8)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 12).attr('fill', 'var(--fg-dim)')
+      .attr('opacity', 0)
+      .text(arm.sublabel)
+      .transition().delay(450 + i * 200).duration(500).attr('opacity', 1);
+  });
+
+  // Center pulsing circle
+  const pulse = g.append('circle')
+    .attr('cx', cx).attr('cy', cy)
+    .attr('r', 0).attr('fill', 'var(--accent)').attr('fill-opacity', 0.2)
+    .attr('stroke', 'var(--accent)').attr('stroke-width', 2);
+
+  pulse.transition().delay(1200).duration(600).attr('r', 18);
+
+  // Pulse animation via repeated transitions
+  function doPulse() {
+    pulse.transition().duration(1200)
+      .attr('r', 24).attr('fill-opacity', 0.35)
+      .transition().duration(1200)
+      .attr('r', 18).attr('fill-opacity', 0.15)
+      .on('end', doPulse);
+  }
+  setTimeout(doPulse, 2000);
+
+  // Center label
+  g.append('text')
+    .attr('x', cx).attr('y', cy + 50)
+    .attr('text-anchor', 'middle')
+    .attr('font-family', '"Source Serif 4", "Iowan Old Style", Charter, Georgia, serif')
+    .attr('font-size', 15).attr('font-weight', 600)
+    .attr('fill', 'var(--fg)')
+    .attr('opacity', 0)
+    .text('Recursive Agent Improvement')
+    .transition().delay(1400).duration(500).attr('opacity', 1);
+}
+
+/* ── CHROME ───────────────────────────────────────────── */
+
+// Reading progress
+const progressEl = document.getElementById('progress');
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  progressEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+}, { passive: true });
+
+// Section entry + lazy viz draw
+const vizDrawnOnce = new Set();
+const entryObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('visible');
+    const id = e.target.id;
+    if (id === 'loop' && !vizDrawnOnce.has('loop')) { drawLoop(); vizDrawnOnce.add('loop'); }
+    if (id === 'sources' && !vizDrawnOnce.has('sources')) { drawSources(); vizDrawnOnce.add('sources'); }
+    if (id === 'convergence' && !vizDrawnOnce.has('convergence')) { drawConvergence(); vizDrawnOnce.add('convergence'); }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -100px 0px' });
+document.querySelectorAll('section').forEach(s => entryObserver.observe(s));
+
+// Domain card animation
+const domainObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const cards = e.target.querySelectorAll('.domain-card');
+    cards.forEach((c, i) => {
+      setTimeout(() => c.classList.add('visible'), 100 + i * 80);
+    });
+  });
+}, { threshold: 0.15 });
+const domainGrid = document.getElementById('domain-cards');
+if (domainGrid) domainObserver.observe(domainGrid);
+
+// Hero draws on load
+addEventListener('DOMContentLoaded', () => { drawHero(); });
+
+// Minimap
+const minimapLinks = document.querySelectorAll('#minimap a');
+const activeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      minimapLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -50% 0px' });
+document.querySelectorAll('main > header, main > section').forEach(el => {
+  if (el.id) activeObserver.observe(el);
+});
+
+// Theme toggle
+const themeBtn = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('kb-narration-theme');
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+themeBtn.textContent = document.documentElement.dataset.theme === 'dark' ? '\u263E' : '\u2600';
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('kb-narration-theme', next);
+  themeBtn.textContent = next === 'dark' ? '\u263E' : '\u2600';
+});
+
+// Keyboard nav
+const sectionIds = ['top', 'loop', 'domains', 'sources', 'convergence', 'whats-next'];
+addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, button')) return;
+  const vy = document.documentElement.scrollTop + innerHeight * 0.3;
+  let cur = 0;
+  sectionIds.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= vy) cur = i;
+  });
+  let next = cur;
+  if (e.key === 'j' || e.key === 'ArrowDown') next = Math.min(sectionIds.length - 1, cur + 1);
+  else if (e.key === 'k' || e.key === 'ArrowUp') next = Math.max(0, cur - 1);
+  else if (e.key === 'g') next = 0;
+  else if (e.key === 'G') next = sectionIds.length - 1;
+  else return;
+  e.preventDefault();
+  document.getElementById(sectionIds[next]).scrollIntoView({ behavior: 'smooth' });
+});
+
+// Resize redraw
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    drawHero();
+    if (vizDrawnOnce.has('loop')) drawLoop();
+    if (vizDrawnOnce.has('sources')) drawSources();
+    if (vizDrawnOnce.has('convergence')) drawConvergence();
+  }, 200);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1118 @@
+<!doctype html>
+<!--
+  KB Narration: Session Management & 1M Context
+  Source: wiki/report/session-management-1m-context.md
+  Forked from: references/template.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Session Management & 1M Context · KB Narration</title>
+<meta name="description" content="Interactive narration of session lifecycle engineering for Claude Code. 20 sources, 4 phases, 7 maturity levels.">
+<script src="https://unpkg.com/d3@7/dist/d3.min.js" defer></script>
+<style>
+:root {
+  --bg:        oklch(0.16 0.010 260);
+  --bg-elev:   oklch(0.21 0.012 260);
+  --bg-hi:     oklch(0.26 0.014 260);
+  --fg:        oklch(0.95 0.004 260);
+  --fg-mid:    oklch(0.78 0.007 260);
+  --fg-dim:    oklch(0.55 0.010 260);
+  --border:    oklch(0.32 0.012 260);
+  --accent:    oklch(0.80 0.16 65);
+  --cool:      oklch(0.76 0.13 200);
+  --grow:      oklch(0.80 0.17 148);
+  --fade:      oklch(0.70 0.16 35);
+  --stop:      oklch(0.55 0.010 260);
+  --shadow:    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.25);
+}
+[data-theme="light"] {
+  --bg:      oklch(0.985 0.004 260);
+  --bg-elev: oklch(0.965 0.006 260);
+  --bg-hi:   oklch(0.92 0.008 260);
+  --fg:      oklch(0.22 0.012 260);
+  --fg-mid:  oklch(0.40 0.010 260);
+  --fg-dim:  oklch(0.55 0.010 260);
+  --border:  oklch(0.82 0.006 260);
+  --accent:  oklch(0.62 0.17 55);
+  --cool:    oklch(0.55 0.13 215);
+  --grow:    oklch(0.55 0.16 148);
+  --fade:    oklch(0.58 0.17 32);
+  --stop:    oklch(0.60 0.010 260);
+  --shadow:  0 1px 0 oklch(1 0 0 / 0.8) inset, 0 6px 18px oklch(0 0 0 / 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+html { scroll-behavior: smooth; }
+body {
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+h1, h2, h3 {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; line-height: 1.15; letter-spacing: -0.015em;
+  margin: 0 0 0.4em;
+}
+h1 { font-size: clamp(2.2rem, 5.5vw, 4rem); }
+h2 { font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin-top: 0.2em; }
+h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.5em; color: var(--fg-mid); }
+p { margin: 0 0 1em; color: var(--fg-mid); }
+p.lede { font-size: 1.15rem; color: var(--fg); max-width: 62ch; }
+em { color: var(--fg); font-style: italic; }
+strong { color: var(--fg); font-weight: 600; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid oklch(from var(--accent) l c h / 0.4); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+main { max-width: 980px; margin: 0 auto; padding: 4rem 1.5rem 6rem; position: relative; }
+section { margin: 4.5rem 0; opacity: 0; transform: translateY(20px); transition: opacity 0.9s ease-out, transform 0.9s ease-out; }
+section.visible { opacity: 1; transform: none; }
+section:first-of-type { margin-top: 2rem; }
+
+#progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cool));
+  width: 0%; z-index: 100;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 12px var(--accent);
+}
+
+#theme-toggle {
+  position: fixed; top: 1.2rem; right: 1.2rem;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-elev); color: var(--fg);
+  border: 1px solid var(--border);
+  font: 16px/1 system-ui; cursor: pointer;
+  z-index: 60; display: grid; place-items: center;
+  transition: background 0.2s, transform 0.2s;
+}
+#theme-toggle:hover { background: var(--bg-hi); transform: rotate(20deg); }
+#theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+#minimap {
+  position: fixed;
+  left: max(1.2rem, calc(50vw - 620px));
+  top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0.6rem;
+  z-index: 50; padding: 0.6rem 0;
+}
+#minimap a {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--fg-dim); border: none;
+  font-size: 0.78rem; font-family: -apple-system, system-ui, sans-serif;
+  border-radius: 4px; transition: color 0.2s;
+  white-space: nowrap;
+}
+#minimap a::before {
+  content: ""; display: inline-block;
+  width: 16px; height: 2px; background: var(--border);
+  transition: width 0.3s, background 0.3s;
+}
+#minimap a:hover { color: var(--fg); }
+#minimap a.active { color: var(--accent); }
+#minimap a.active::before { width: 28px; background: var(--accent); }
+@media (max-width: 1200px) { #minimap { display: none; } }
+
+.hero { padding: 2rem 0 1rem; }
+.hero .date {
+  display: inline-block;
+  font: 600 0.72rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 0.4rem 0.7rem;
+  border: 1px solid oklch(from var(--accent) l c h / 0.4);
+  border-radius: 100px;
+  margin-bottom: 1.6rem;
+}
+.hero h1 { max-width: 18ch; }
+.hero .subtitle {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-style: italic; font-size: 1.25rem;
+  color: var(--fg-mid); max-width: 55ch;
+  margin: -0.2em 0 2rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem; margin: 2rem 0 1rem;
+}
+.stat {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.3rem;
+  box-shadow: var(--shadow);
+  transition: transform 0.3s, border-color 0.3s;
+}
+.stat:hover { transform: translateY(-2px); border-color: var(--accent); }
+.stat .value {
+  display: block;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; font-size: 2.6rem; line-height: 1;
+  letter-spacing: -0.03em; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.stat .label { display: block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--fg-dim); line-height: 1.4; }
+.stat.accent .value { color: var(--accent); }
+.stat.cool   .value { color: var(--cool); }
+.stat.grow   .value { color: var(--grow); }
+.stat.accent, .stat.accent:hover { cursor: pointer; }
+
+.pullquote {
+  margin: 3rem 0;
+  padding: 1.8rem 2rem 1.8rem 2.3rem;
+  background: linear-gradient(135deg,
+    oklch(from var(--accent) l c h / 0.08),
+    oklch(from var(--accent) l c h / 0.02));
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+}
+.pullquote p {
+  font-size: 1.4rem; line-height: 1.35; margin: 0;
+  color: var(--fg); font-style: italic;
+}
+.pullquote cite {
+  display: block; margin-top: 0.9rem;
+  font-style: normal; font-size: 0.82rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--fg-dim);
+  font-family: -apple-system, system-ui, sans-serif;
+}
+
+.viz {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: var(--shadow);
+}
+.viz svg { display: block; width: 100%; height: auto; overflow: visible; }
+.viz .caption {
+  font-size: 0.82rem; color: var(--fg-dim);
+  margin-top: 1rem; padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.phase-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem; margin: 1.5rem 0;
+}
+@media (max-width: 800px) { .phase-grid { grid-template-columns: 1fr; } }
+.phase-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-top-width: 3px;
+  border-radius: 10px;
+  padding: 1.3rem;
+  box-shadow: var(--shadow);
+  opacity: 0.4;
+  transform: translateY(8px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out, border-color 0.3s;
+}
+.phase-card.lit { opacity: 1; transform: none; }
+.phase-card .phase-num {
+  font: 600 0.72rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  margin-bottom: 0.6rem;
+}
+.phase-card .phase-title {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-size: 1.1rem; font-weight: 600; color: var(--fg);
+  margin-bottom: 0.5rem;
+}
+.phase-card .phase-desc {
+  font-size: 0.85rem; color: var(--fg-mid); line-height: 1.5;
+  margin-bottom: 0.8rem;
+}
+.phase-card .tool-list {
+  list-style: none; padding: 0; margin: 0;
+}
+.phase-card .tool-list li {
+  font-size: 0.8rem; color: var(--fg-dim); padding: 0.2rem 0;
+  display: flex; justify-content: space-between;
+}
+.phase-card .tool-list li .likes {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.phase-card.start { border-top-color: var(--cool); }
+.phase-card.start .phase-num { color: var(--cool); }
+.phase-card.start .tool-list li .likes { color: var(--cool); }
+.phase-card.health { border-top-color: var(--accent); }
+.phase-card.health .phase-num { color: var(--accent); }
+.phase-card.health .tool-list li .likes { color: var(--accent); }
+.phase-card.handover { border-top-color: var(--grow); }
+.phase-card.handover .phase-num { color: var(--grow); }
+.phase-card.handover .tool-list li .likes { color: var(--grow); }
+.phase-card.async { border-top-color: oklch(0.72 0.14 280); }
+.phase-card.async .phase-num { color: oklch(0.72 0.14 280); }
+.phase-card.async .tool-list li .likes { color: oklch(0.72 0.14 280); }
+
+.ladder {
+  position: relative;
+  margin: 1.5rem 0;
+}
+.ladder-step {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  cursor: default;
+}
+.ladder-step:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px oklch(from var(--accent) l c h / 0.12);
+}
+.ladder-step .level-num {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-size: 2rem; font-weight: 600;
+  color: var(--fg-dim);
+  display: flex; align-items: center; justify-content: center;
+}
+.ladder-step .level-body { }
+.ladder-step .level-name {
+  font-weight: 600; font-size: 0.95rem; color: var(--fg);
+  margin-bottom: 0.2rem;
+}
+.ladder-step .level-desc {
+  font-size: 0.82rem; color: var(--fg-mid); line-height: 1.5;
+}
+.ladder-step .level-tools {
+  font-size: 0.78rem; color: var(--fg-dim); margin-top: 0.3rem;
+  max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out;
+}
+.ladder-step:hover .level-tools { max-height: 4rem; }
+.ladder-step.marker-most::after {
+  content: "most practitioners";
+  position: absolute; right: -0.5rem; transform: translateX(100%);
+  font-size: 0.72rem; color: var(--fade);
+  font-family: -apple-system, system-ui, sans-serif;
+  font-weight: 600; letter-spacing: 0.08em;
+  white-space: nowrap;
+  padding: 0.2rem 0.5rem;
+  border-left: 2px solid var(--fade);
+}
+.ladder-step.marker-10x::after {
+  content: "10x users";
+  position: absolute; right: -0.5rem; transform: translateX(100%);
+  font-size: 0.72rem; color: var(--grow);
+  font-family: -apple-system, system-ui, sans-serif;
+  font-weight: 600; letter-spacing: 0.08em;
+  white-space: nowrap;
+  padding: 0.2rem 0.5rem;
+  border-left: 2px solid var(--grow);
+}
+@media (max-width: 800px) {
+  .ladder-step.marker-most::after,
+  .ladder-step.marker-10x::after { display: none; }
+}
+
+.chip {
+  display: inline-block; padding: 0.1em 0.55em;
+  background: oklch(from var(--cool) l c h / 0.13);
+  color: var(--cool);
+  border: 1px solid oklch(from var(--cool) l c h / 0.4);
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: -apple-system, system-ui, sans-serif;
+  white-space: nowrap;
+}
+.chip.start { background: oklch(from var(--cool) l c h / 0.13); color: var(--cool); border-color: oklch(from var(--cool) l c h / 0.4); }
+.chip.health { background: oklch(from var(--accent) l c h / 0.13); color: var(--accent); border-color: oklch(from var(--accent) l c h / 0.4); }
+.chip.handover { background: oklch(from var(--grow) l c h / 0.13); color: var(--grow); border-color: oklch(from var(--grow) l c h / 0.4); }
+.chip.async { background: oklch(0.72 0.14 280 / 0.13); color: oklch(0.72 0.14 280); border-color: oklch(0.72 0.14 280 / 0.4); }
+
+.trend-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem; margin: 1.5rem 0;
+}
+@media (max-width: 800px) { .trend-cards { grid-template-columns: 1fr; } }
+.trend-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 1.3rem;
+  box-shadow: var(--shadow);
+}
+.trend-card .trend-num {
+  font: 600 0.72rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--accent); letter-spacing: 0.12em;
+  margin-bottom: 0.5rem;
+}
+.trend-card .trend-title {
+  font-family: "Source Serif 4", serif;
+  font-size: 1.05rem; font-weight: 600; color: var(--fg);
+  margin-bottom: 0.4rem;
+}
+.trend-card .trend-desc {
+  font-size: 0.85rem; color: var(--fg-mid); line-height: 1.5;
+}
+
+footer {
+  margin-top: 6rem; padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim); font-size: 0.8rem;
+  text-align: center;
+}
+footer a { color: var(--fg-dim); border-bottom-color: var(--border); }
+
+.kbd {
+  display: inline-block; padding: 0.1em 0.45em;
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px; border-radius: 4px;
+  font: 600 0.72em/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--fg-mid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  section { opacity: 1; transform: none; }
+  .phase-card { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<button id="theme-toggle" aria-label="Toggle theme" title="Toggle light / dark">☾</button>
+
+<nav id="minimap" aria-label="Section navigation">
+  <a href="#top">Top</a>
+  <a href="#lifecycle">Lifecycle</a>
+  <a href="#start">Start</a>
+  <a href="#health">Health</a>
+  <a href="#handover">Handover</a>
+  <a href="#async">Async</a>
+  <a href="#sources">Sources</a>
+  <a href="#maturity">Maturity</a>
+  <a href="#trends">Trends</a>
+</nav>
+
+<main id="top">
+
+  <!-- ━━━ HERO ━━━ -->
+  <header class="hero">
+    <span class="date">Session Management Report · 2026-04-16</span>
+    <h1>1M tokens. Same wall.</h1>
+    <p class="subtitle">The practitioners getting 10x&ndash;100x from Claude Code aren't smarter at prompting &mdash; they engineered their session lifecycle.</p>
+    <div class="viz">
+      <svg id="hero-viz" viewBox="0 0 900 420" aria-label="Context window fill animation: signal vs noise competing for 1M tokens"></svg>
+      <div class="caption">
+        A context window fills with <strong style="color:var(--grow)">signal</strong> (decisions, traces, context) and
+        <strong style="color:var(--fade)">noise</strong> (stale output, failed attempts, verbose errors).
+        At 80%, signal-to-noise visibly degrades. Then compaction kicks in. Click <strong style="color:var(--accent)">1M tokens</strong> to replay.
+      </div>
+    </div>
+    <p class="lede">
+      Every Claude Code session starts with a finite context window. Even at 1M tokens &mdash; roughly 750,000 words &mdash;
+      your session will eventually fill up. When it does, you lose everything: decisions, debug traces, discovered patterns.
+      This report maps the complete session management landscape across 20 sources and 8 concept pages, and shows how
+      the best practitioners engineer every phase of the session lifecycle.
+    </p>
+  </header>
+
+  <div class="pullquote">
+    <p>"Released today: /loop &mdash; a powerful new way to schedule recurring tasks."</p>
+    <cite>&mdash; bcherny &middot; 12,822 likes</cite>
+  </div>
+
+  <!-- ━━━ LIFECYCLE OVERVIEW ━━━ -->
+  <section id="lifecycle">
+    <h2>Four phases, four failure modes</h2>
+    <p>
+      A Claude Code session moves through four phases. Each has its own way of failing silently and its own set of
+      tools. The engineered approach isn't about any single trick &mdash; it's about covering all four.
+    </p>
+    <div class="stat-grid">
+      <div class="stat cool">
+        <span class="value">25+</span>
+        <span class="label">sources synthesized<br><em>across 8 concept pages</em></span>
+      </div>
+      <div class="stat accent" id="stat-hero" title="Click to replay the hero animation" style="cursor:pointer">
+        <span class="value">1M</span>
+        <span class="label">token context window<br><em>click to replay animation</em></span>
+      </div>
+      <div class="stat grow">
+        <span class="value">4</span>
+        <span class="label">lifecycle phases<br><em>start &middot; health &middot; handover &middot; async</em></span>
+      </div>
+      <div class="stat" style="--phase-color: oklch(0.72 0.14 280);">
+        <span class="value" style="color:oklch(0.72 0.14 280)">7</span>
+        <span class="label">maturity levels<br><em>naive to full lifecycle</em></span>
+      </div>
+    </div>
+
+    <div class="phase-grid" id="phase-panels">
+      <div class="phase-card start" data-phase="0">
+        <div class="phase-num">Phase 1</div>
+        <div class="phase-title">Start</div>
+        <div class="phase-desc">Context loading. What you load in the first seconds determines the ceiling.</div>
+        <ul class="tool-list">
+          <li><span>Auto-memory</span> <span class="likes">15,845</span></li>
+          <li><span>HANDOVER.md</span> <span class="likes">3,296</span></li>
+          <li><span>PAI Statusline</span> <span class="likes">311</span></li>
+        </ul>
+      </div>
+      <div class="phase-card health" data-phase="1">
+        <div class="phase-num">Phase 2</div>
+        <div class="phase-title">Health</div>
+        <div class="phase-desc">Context management. The window fills with noise &mdash; you lose without knowing it.</div>
+        <ul class="tool-list">
+          <li><span>autoCompact bug</span> <span class="likes">6,307</span></li>
+          <li><span>Context+</span> <span class="likes">2,397</span></li>
+          <li><span>RTK</span> <span class="likes">1,951</span></li>
+        </ul>
+      </div>
+      <div class="phase-card handover" data-phase="2">
+        <div class="phase-num">Phase 3</div>
+        <div class="phase-title">Handover</div>
+        <div class="phase-desc">Session end. Work compounds or evaporates &mdash; this phase decides which.</div>
+        <ul class="tool-list">
+          <li><span>NotebookLM bridge</span> <span class="likes">5,368</span></li>
+          <li><span>Self-improving rules</span> <span class="likes">3,266</span></li>
+          <li><span>npx continues</span> <span class="likes">2,534</span></li>
+        </ul>
+      </div>
+      <div class="phase-card async" data-phase="3">
+        <div class="phase-num">Phase 4</div>
+        <div class="phase-title">Async</div>
+        <div class="phase-desc">Sessions that run when you're not there. The final evolution.</div>
+        <ul class="tool-list">
+          <li><span>/loop</span> <span class="likes">12,822</span></li>
+          <li><span>Cloud tasks</span> <span class="likes">7,469</span></li>
+          <li><span>Phone remote</span> <span class="likes">4,615</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ PHASE 1: START ━━━ -->
+  <section id="start">
+    <h2>Phase 1: Context Loading</h2>
+    <p>
+      The session is empty. The naive approach: type your question and hope Claude figures out the codebase.
+      This burns thousands of tokens on exploration that a well-primed session never needs. A well-primed session
+      starts with <strong>10&ndash;50k tokens of structured context</strong>. A cold session wastes the same budget
+      <em>rediscovering</em> that context through tool calls.
+    </p>
+    <p>
+      <span class="chip start">CLAUDE.md</span> and resolvers load project context automatically.
+      <span class="chip start">Auto-memory</span> <em>(Thariq, 15,845 likes)</em> lets Claude manage its own cross-session memory.
+      <span class="chip start">HANDOVER.md</span> <em>(Zara Zhang, 3,296 likes)</em> carries decisions, pitfalls, and next steps
+      from the previous session. <span class="chip start">PAI Statusline v5</span> <em>(DanielMiessler, 311 likes)</em> shows
+      exactly which custom files loaded.
+    </p>
+  </section>
+
+  <div class="pullquote">
+    <p>"Claude now remembers what it learns across sessions &mdash; your project context, debugging patterns,
+    preferred approaches &mdash; and recalls it later without you having to write anything down."</p>
+    <cite>&mdash; Thariq &middot; 15,845 likes &middot; auto-memory launch</cite>
+  </div>
+
+  <!-- ━━━ PHASE 2: HEALTH ━━━ -->
+  <section id="health">
+    <h2>Phase 2: Context Management</h2>
+    <p>
+      This is where most practitioners lose without knowing it. The context window is filling with noise &mdash;
+      stale tool outputs, failed attempts, verbose error messages. By the time you notice, you're at
+      <strong>80% capacity with 20% signal</strong>.
+    </p>
+    <p>
+      The 1M context paradox: <em>more room doesn't solve the problem &mdash; it delays it</em>. At 100k tokens,
+      you hit the wall in 30 minutes. At 1M tokens, you hit it in 3 hours. But the wall is the same wall,
+      and the crash is worse because you've invested more.
+    </p>
+    <h3>Compaction: the invisible infrastructure</h3>
+    <p>
+      Claude Code's <span class="chip health">autoCompact</span> automatically compresses context as it fills.
+      But the leaked source revealed it has <strong>no retry limit</strong> &mdash; one session had
+      <strong>3,272 consecutive compaction failures</strong> before anyone noticed
+      <em>(imyouhu, 6,307 likes)</em>.
+    </p>
+    <p>
+      <span class="chip health">Context+</span> <em>(forloopcodes, 2,397 likes)</em> strips noise before it reaches the agent:
+      6.5k fewer tokens, found the code, fixed it in half the time.
+      <span class="chip health">RTK</span> <em>(jasonzhou1993, 1,951 likes)</em> reduces token use by up to 60%.
+      The meta-insight: session health is an <strong>observability problem</strong>. The context window is invisible by default.
+    </p>
+  </section>
+
+  <div class="pullquote">
+    <p>"The leaked Claude Code source revealed autoCompact has no retry limit &mdash;
+    one session had 3,272 consecutive compaction failures before anyone noticed."</p>
+    <cite>&mdash; imyouhu &middot; 6,307 likes &middot; autoCompact infinite retry bug</cite>
+  </div>
+
+  <!-- ━━━ PHASE 3: HANDOVER ━━━ -->
+  <section id="handover">
+    <h2>Phase 3: Session Handover</h2>
+    <p>
+      The session is ending. What happens next determines whether the work compounds or evaporates.
+    </p>
+    <p>
+      <span class="chip handover">bcherny's self-improving handover</span> <em>(3,266 likes)</em>:
+      "After every correction, end with: 'Update your CLAUDE.md so you don't make that mistake again.'
+      Claude is eerily good at writing rules for itself." The handover isn't just context &mdash;
+      it's <strong>accumulated judgment</strong>.
+    </p>
+    <p>
+      <span class="chip handover">Session forking</span> <em>(bcherny, 861 likes)</em>: fork before
+      the context fills, explore a branch, come back. <span class="chip handover">npx continues</span>
+      <em>(yigitkonur, 2,534 likes)</em> moves context between Claude Code, Gemini, Copilot, and Codex
+      when you hit rate limits. <span class="chip handover">NotebookLM</span> <em>(hooeem, 5,368 likes)</em>
+      makes your HANDOVER.md a persistent retrieval layer outside the context window &mdash;
+      300 sources free, no token cost.
+    </p>
+  </section>
+
+  <!-- ━━━ PHASE 4: ASYNC ━━━ -->
+  <section id="async">
+    <h2>Phase 4: Running Without You</h2>
+    <p>
+      The final evolution: sessions that run when you're not there. Not "ask Claude to do X" but
+      <strong>"hire Claude to keep X handled"</strong> &mdash; a background employee, not a one-shot request.
+    </p>
+    <p>
+      <span class="chip async">/loop</span> <em>(bcherny, 12,822 likes)</em>: schedule Claude to repeat a task
+      on intervals up to 7 days. <code>/loop 5m /babysit</code> &mdash; every 5 minutes, auto-address review
+      comments, auto-rebase, fix builds.
+    </p>
+    <p>
+      <span class="chip async">Cloud tasks</span> <em>(noahzweben, 7,469 likes)</em>: set a repo, a cron, a prompt.
+      Claude runs on Anthropic infra on schedule. <span class="chip async">Phone remote</span>
+      <em>(bcherny, 4,615 likes)</em>: spawn sessions from the Claude mobile app.
+      <span class="chip async">--sdk-url</span> <em>(Stan Girard, 4,064 likes)</em>: the terminal UI disappears
+      and Claude becomes a WebSocket client &mdash; the session interface becomes whatever you want.
+    </p>
+  </section>
+
+  <!-- ━━━ SOURCES BAR CHART ━━━ -->
+  <section id="sources">
+    <h2>Source landscape</h2>
+    <p>
+      Twenty sources ranked by engagement, colored by which lifecycle phase they belong to.
+      The range spans two orders of magnitude &mdash; from 282 likes to 15,845 &mdash; so the x-axis is logarithmic.
+    </p>
+    <div class="viz">
+      <svg id="source-bars" viewBox="0 0 900 680" aria-label="Source engagement bar chart, 20 sources ranked by likes on a log scale"></svg>
+      <div class="caption">
+        Log scale. Colors:
+        <span style="color:var(--cool)">start</span> &middot;
+        <span style="color:var(--accent)">health</span> &middot;
+        <span style="color:var(--grow)">handover</span> &middot;
+        <span style="color:oklch(0.72 0.14 280)">async</span>.
+        20 sources across 8 concept pages.
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ MATURITY LADDER ━━━ -->
+  <section id="maturity">
+    <h2>Where are you?</h2>
+    <p>
+      Seven levels from naive to full lifecycle. Most practitioners are at level 2&ndash;3.
+      The 10x users are at 6&ndash;7. Hover a level to see which tools belong to it.
+    </p>
+    <div class="ladder" id="maturity-ladder">
+      <div class="ladder-step" data-level="1">
+        <div class="level-num">1</div>
+        <div class="level-body">
+          <div class="level-name">Naive</div>
+          <div class="level-desc">Single session, start from scratch each time. Low token efficiency, no continuity.</div>
+          <div class="level-tools">No tools &mdash; the default experience.</div>
+        </div>
+      </div>
+      <div class="ladder-step" data-level="2">
+        <div class="level-num">2</div>
+        <div class="level-body">
+          <div class="level-name">CLAUDE.md</div>
+          <div class="level-desc">Project context auto-loads at session start. Medium efficiency &mdash; primed but no mid-session management.</div>
+          <div class="level-tools">CLAUDE.md, resolvers, PAI Statusline</div>
+        </div>
+      </div>
+      <div class="ladder-step marker-most" data-level="3" style="position:relative">
+        <div class="level-num">3</div>
+        <div class="level-body">
+          <div class="level-name">Handover</div>
+          <div class="level-desc">HANDOVER.md generated at session end, loaded at start. Decisions persist across sessions.</div>
+          <div class="level-tools">HANDOVER.md, /handover command, NotebookLM</div>
+        </div>
+      </div>
+      <div class="ladder-step" data-level="4">
+        <div class="level-num">4</div>
+        <div class="level-body">
+          <div class="level-name">Auto-memory</div>
+          <div class="level-desc">Claude manages its own cross-session context. High efficiency, no manual overhead.</div>
+          <div class="level-tools">Auto-memory, self-improving CLAUDE.md rules</div>
+        </div>
+      </div>
+      <div class="ladder-step" data-level="5">
+        <div class="level-num">5</div>
+        <div class="level-body">
+          <div class="level-name">Compaction</div>
+          <div class="level-desc">Context actively managed mid-session; noise stripped. Signal-to-noise stays healthy.</div>
+          <div class="level-tools">autoCompact, Context+, RTK, token burden viz</div>
+        </div>
+      </div>
+      <div class="ladder-step marker-10x" data-level="6" style="position:relative">
+        <div class="level-num">6</div>
+        <div class="level-body">
+          <div class="level-name">Async Loops</div>
+          <div class="level-desc">/loop, /schedule, cloud tasks running without you. Very high efficiency.</div>
+          <div class="level-tools">/loop, cloud tasks, phone remote, Dispatch</div>
+        </div>
+      </div>
+      <div class="ladder-step" data-level="7">
+        <div class="level-num" style="color:var(--accent)">7</div>
+        <div class="level-body">
+          <div class="level-name">Full Lifecycle</div>
+          <div class="level-desc">Primed start + active compaction + handover + async. Every token earns its keep.</div>
+          <div class="level-tools">All of the above &mdash; perpetual continuity</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ TRENDS ━━━ -->
+  <section id="trends">
+    <h2>What's converging</h2>
+    <p>
+      Three trends are making the session lifecycle as we know it obsolete &mdash; by absorbing it into infrastructure.
+    </p>
+    <div class="trend-cards">
+      <div class="trend-card">
+        <div class="trend-num">Trend 1</div>
+        <div class="trend-title">Compaction becomes infrastructure</div>
+        <div class="trend-desc">
+          The leaked Claude Code compaction engine is already LangChain middleware.
+          Within months, every agent framework will have it. Manual context management becomes optional.
+        </div>
+      </div>
+      <div class="trend-card">
+        <div class="trend-num">Trend 2</div>
+        <div class="trend-title">Memory becomes the moat</div>
+        <div class="trend-desc">
+          As sessions get better at persisting knowledge, the accumulated context becomes the competitive advantage &mdash;
+          not the model, not the prompts, but the years of decisions your agent remembers.
+        </div>
+      </div>
+      <div class="trend-card">
+        <div class="trend-num">Trend 3</div>
+        <div class="trend-title">Sessions become invisible</div>
+        <div class="trend-desc">
+          Between auto-memory, cloud schedules, and remote control, the concept of a "session" dissolves.
+          Claude is always running, always remembering, always available. Managing sessions will feel like
+          managing TCP connections &mdash; still there, but abstracted away.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Narration of <a href="../report/session-management-1m-context.md">session-management-1m-context.md</a>
+      · rendered by <code>/kb-narration</code> · d3 v7<br>
+      Use <span class="kbd">j</span> <span class="kbd">k</span> or <span class="kbd">↓</span> <span class="kbd">↑</span> to move between sections.
+    </p>
+  </footer>
+</main>
+
+<script>
+/* ────────────────────────────────────────────────────────────────
+ * DATA
+ * ──────────────────────────────────────────────────────────────── */
+const DATA = {
+  sources: [
+    { label:'Auto-memory (Thariq)',         likes:15845, phase:'start' },
+    { label:'/loop (bcherny)',              likes:12822, phase:'async' },
+    { label:'Cloud tasks (noahzweben)',     likes:7469,  phase:'async' },
+    { label:'autoCompact bug (imyouhu)',    likes:6307,  phase:'health' },
+    { label:'Memory arch (himanshustwts)',  likes:6298,  phase:'start' },
+    { label:'NotebookLM (hooeem)',          likes:5368,  phase:'handover' },
+    { label:'Phone remote (bcherny)',       likes:4615,  phase:'async' },
+    { label:'--sdk-url (Stan Girard)',      likes:4064,  phase:'async' },
+    { label:'/handover (Zara Zhang)',       likes:3296,  phase:'handover' },
+    { label:'Session dashboard (Poet)',     likes:3315,  phase:'health' },
+    { label:'17%→92% traces (caspar_br)',   likes:680,   phase:'health' },
+    { label:'npx continues (yigitkonur)',   likes:2534,  phase:'handover' },
+    { label:'Context+ (forloopcodes)',      likes:2397,  phase:'health' },
+    { label:'Code search (alexalbert)',     likes:2274,  phase:'health' },
+    { label:'RTK (jasonzhou1993)',          likes:1951,  phase:'health' },
+    { label:'call-me (tom_doerr)',          likes:1599,  phase:'async' },
+    { label:'Model tiers (levelsio)',       likes:1548,  phase:'health' },
+    { label:'Server compaction (OpenAI)',   likes:1224,  phase:'health' },
+    { label:'Watchdog (Yam Peleg)',         likes:1054,  phase:'health' },
+    { label:'Session forking (bcherny)',    likes:861,   phase:'handover' },
+  ],
+
+  maturity: [
+    { level:1, name:'Naive',          tools:[] },
+    { level:2, name:'CLAUDE.md',      tools:['CLAUDE.md','resolvers','PAI Statusline'] },
+    { level:3, name:'Handover',       tools:['HANDOVER.md','/handover','NotebookLM'] },
+    { level:4, name:'Auto-memory',    tools:['auto-memory','self-improving rules'] },
+    { level:5, name:'Compaction',     tools:['autoCompact','Context+','RTK','token burden'] },
+    { level:6, name:'Async Loops',    tools:['/loop','cloud tasks','phone remote','Dispatch'] },
+    { level:7, name:'Full Lifecycle', tools:['all of the above'] },
+  ]
+};
+
+const phaseColor = {
+  start:    'var(--cool)',
+  health:   'var(--accent)',
+  handover: 'var(--grow)',
+  async:    'oklch(0.72 0.14 280)'
+};
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ────────────────────────────────────────────────────────────────
+ * HERO VIZ — Context window fill animation
+ * ──────────────────────────────────────────────────────────────── */
+function drawHero(replay) {
+  const svg = d3.select('#hero-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 420;
+  const pad = 60;
+  const containerX = pad, containerY = 80;
+  const containerW = W - pad*2, containerH = 260;
+
+  // Container outline
+  svg.append('rect')
+    .attr('x', containerX).attr('y', containerY)
+    .attr('width', containerW).attr('height', containerH)
+    .attr('fill', 'none')
+    .attr('stroke', 'var(--border)')
+    .attr('stroke-width', 2)
+    .attr('rx', 8);
+
+  // Capacity markers
+  [0.25, 0.5, 0.8].forEach(pct => {
+    const x = containerX + containerW * pct;
+    svg.append('line')
+      .attr('x1', x).attr('x2', x)
+      .attr('y1', containerY).attr('y2', containerY + containerH)
+      .attr('stroke', 'var(--border)')
+      .attr('stroke-dasharray', '3 4')
+      .attr('stroke-width', 0.5);
+    svg.append('text')
+      .attr('x', x).attr('y', containerY - 8)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--fg-dim)').attr('font-size', 10)
+      .text(Math.round(pct*100) + '%');
+  });
+
+  // Label
+  svg.append('text')
+    .attr('x', containerX).attr('y', containerY - 28)
+    .attr('fill', 'var(--fg-dim)').attr('font-size', 12)
+    .text('context window capacity');
+
+  // Generate particles: ~60 signal, ~40 noise initially
+  const totalParticles = 120;
+  const signalCount = 55;
+  const noiseCount = totalParticles - signalCount;
+  const particles = [];
+  for (let i = 0; i < totalParticles; i++) {
+    const isSignal = i < signalCount;
+    const fillPct = (i / totalParticles); // 0-1 representing fill order
+    particles.push({
+      id: i,
+      type: isSignal ? 'signal' : 'noise',
+      targetX: containerX + 8 + fillPct * (containerW - 16),
+      targetY: containerY + 20 + Math.random() * (containerH - 40),
+      r: isSignal ? 4 + Math.random()*2 : 3 + Math.random()*3,
+      fillPct: fillPct
+    });
+  }
+
+  // Shuffle for visual variety
+  for (let i = particles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [particles[i], particles[j]] = [particles[j], particles[i]];
+  }
+
+  const circles = svg.selectAll('circle.particle').data(particles).join('circle')
+    .attr('class', 'particle')
+    .attr('cx', d => containerX - 20)
+    .attr('cy', d => d.targetY)
+    .attr('r', d => d.r)
+    .attr('fill', d => d.type === 'signal' ? 'var(--grow)' : 'var(--fade)')
+    .attr('fill-opacity', d => d.type === 'signal' ? 0.7 : 0.5)
+    .attr('opacity', 0);
+
+  const dur = reducedMotion ? 1 : 500;
+  const stagger = reducedMotion ? 0 : 15;
+
+  // Phase 1: Fill animation
+  circles.transition()
+    .delay((_, i) => 200 + i * stagger)
+    .duration(dur)
+    .attr('opacity', 1)
+    .attr('cx', d => d.targetX);
+
+  // Hero callout — "1M tokens"
+  const heroText = svg.append('text')
+    .attr('x', W/2).attr('y', H - 30)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--accent)')
+    .attr('font-size', 44).attr('font-weight', 700)
+    .attr('font-family', 'Source Serif 4, serif')
+    .attr('opacity', 0)
+    .attr('cursor', 'pointer')
+    .text('1M tokens');
+
+  const heroSub = svg.append('text')
+    .attr('x', W/2).attr('y', H - 6)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg-dim)').attr('font-size', 12)
+    .attr('opacity', 0)
+    .text('same wall, worse crash');
+
+  // 80% degradation indicator
+  const degradeX = containerX + containerW * 0.8;
+  const degradeLine = svg.append('line')
+    .attr('x1', degradeX).attr('x2', degradeX)
+    .attr('y1', containerY).attr('y2', containerY + containerH)
+    .attr('stroke', 'var(--fade)')
+    .attr('stroke-width', 2)
+    .attr('stroke-dasharray', '6 3')
+    .attr('opacity', 0);
+
+  const degradeLabel = svg.append('text')
+    .attr('x', degradeX + 6).attr('y', containerY + 18)
+    .attr('fill', 'var(--fade)').attr('font-size', 11).attr('font-weight', 600)
+    .attr('opacity', 0)
+    .text('signal degrades');
+
+  const fillTime = 200 + totalParticles * stagger + dur;
+
+  if (!reducedMotion) {
+    // Phase 2: Show degradation at 80%
+    setTimeout(() => {
+      degradeLine.transition().duration(400).attr('opacity', 0.8);
+      degradeLabel.transition().duration(400).attr('opacity', 1);
+    }, fillTime * 0.7);
+
+    // Phase 3: Compaction — noise shrinks, signal stays
+    setTimeout(() => {
+      circles.filter(d => d.type === 'noise')
+        .transition().duration(800)
+        .attr('r', d => d.r * 0.3)
+        .attr('fill-opacity', 0.15)
+        .attr('cx', d => containerX + 8 + d.fillPct * (containerW * 0.5 - 16));
+
+      circles.filter(d => d.type === 'signal')
+        .transition().duration(800)
+        .attr('fill-opacity', 0.9)
+        .attr('cx', d => containerX + 8 + (d.fillPct < 0.5 ? d.fillPct : d.fillPct * 0.6) * (containerW - 16));
+
+      degradeLabel.transition().duration(400)
+        .attr('opacity', 0);
+      degradeLine.transition().duration(400)
+        .attr('opacity', 0);
+
+      // Compaction label
+      svg.append('text')
+        .attr('x', containerX + containerW * 0.65).attr('y', containerY + containerH / 2 + 4)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'var(--grow)').attr('font-size', 13).attr('font-weight', 600)
+        .attr('opacity', 0)
+        .text('compaction: noise sheds, signal stays')
+        .transition().delay(400).duration(500).attr('opacity', 1);
+    }, fillTime + 800);
+
+    // Phase 4: Show hero callout
+    setTimeout(() => {
+      heroText.transition().duration(600).attr('opacity', 1);
+      heroSub.transition().duration(600).attr('opacity', 1);
+    }, fillTime + 2000);
+  } else {
+    degradeLine.attr('opacity', 0);
+    heroText.attr('opacity', 1);
+    heroSub.attr('opacity', 1);
+    svg.append('text')
+      .attr('x', containerX + containerW * 0.65).attr('y', containerY + containerH / 2 + 4)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--grow)').attr('font-size', 13).attr('font-weight', 600)
+      .text('compaction: noise sheds, signal stays');
+  }
+
+  // Pay-off: clicking "1M tokens" replays
+  heroText.on('click', () => drawHero(true));
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * VIZ 2 — Source engagement bar chart (log scale)
+ * ──────────────────────────────────────────────────────────────── */
+function drawSources() {
+  const svg = d3.select('#source-bars');
+  svg.selectAll('*').remove();
+  const W = 900, H = 680;
+  const m = { top: 20, right: 60, bottom: 40, left: 220 };
+  const iw = W - m.left - m.right, ih = H - m.top - m.bottom;
+  const g = svg.append('g').attr('transform', `translate(${m.left},${m.top})`);
+
+  const data = DATA.sources.slice().sort((a,b) => b.likes - a.likes);
+  const y = d3.scaleBand().domain(data.map(d => d.label)).range([0, ih]).padding(0.18);
+  const x = d3.scaleLog().domain([500, 20000]).range([0, iw]).clamp(true);
+
+  // Grid lines
+  [1000, 2000, 5000, 10000].forEach(v => {
+    g.append('line')
+      .attr('x1', x(v)).attr('x2', x(v))
+      .attr('y1', 0).attr('y2', ih)
+      .attr('stroke', 'var(--border)')
+      .attr('stroke-dasharray', '2 4');
+    g.append('text')
+      .attr('x', x(v)).attr('y', ih + 20)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--fg-dim)').attr('font-size', 10)
+      .text(v >= 1000 ? (v/1000) + 'k' : v);
+  });
+
+  // Bars
+  g.selectAll('rect.bar').data(data).join('rect')
+    .attr('class', 'bar')
+    .attr('x', 0).attr('y', d => y(d.label))
+    .attr('height', y.bandwidth())
+    .attr('width', 0)
+    .attr('fill', d => phaseColor[d.phase])
+    .attr('fill-opacity', 0.2)
+    .attr('stroke', d => phaseColor[d.phase])
+    .attr('stroke-width', 1)
+    .transition().delay((_, i) => reducedMotion ? 0 : 50*i).duration(reducedMotion ? 1 : 600)
+    .attr('width', d => Math.max(0, x(d.likes)));
+
+  // Labels
+  g.selectAll('text.lbl').data(data).join('text')
+    .attr('class', 'lbl')
+    .attr('x', -8).attr('y', d => y(d.label) + y.bandwidth()/2 + 4)
+    .attr('text-anchor', 'end')
+    .attr('fill', 'var(--fg-mid)').attr('font-size', 11)
+    .text(d => d.label);
+
+  // Values
+  g.selectAll('text.val').data(data).join('text')
+    .attr('class', 'val')
+    .attr('x', d => Math.max(0, x(d.likes)) + 6)
+    .attr('y', d => y(d.label) + y.bandwidth()/2 + 4)
+    .attr('fill', d => phaseColor[d.phase])
+    .attr('font-size', 10).attr('font-weight', 600)
+    .attr('font-variant-numeric', 'tabular-nums')
+    .attr('opacity', 0)
+    .text(d => d.likes.toLocaleString())
+    .transition().delay((_, i) => reducedMotion ? 0 : 50*i + 400).duration(reducedMotion ? 1 : 300)
+    .attr('opacity', 1);
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * CHROME — progress, observers, theme, keyboard, resize
+ * ──────────────────────────────────────────────────────────────── */
+
+// Reading progress
+const progressEl = document.getElementById('progress');
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  progressEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+}, { passive: true });
+
+// Section entry + lazy viz draw
+const vizDrawnOnce = new Set();
+const entryObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('visible');
+    const id = e.target.id;
+    if (id === 'sources' && !vizDrawnOnce.has(id)) { drawSources(); vizDrawnOnce.add(id); }
+    // Light up phase cards when lifecycle section enters
+    if (id === 'lifecycle' && !vizDrawnOnce.has(id)) {
+      vizDrawnOnce.add(id);
+      document.querySelectorAll('.phase-card').forEach((card, i) => {
+        setTimeout(() => card.classList.add('lit'), reducedMotion ? 0 : 200 + i * 300);
+      });
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -100px 0px' });
+document.querySelectorAll('section').forEach(s => entryObserver.observe(s));
+
+// Hero draws on load
+addEventListener('DOMContentLoaded', () => { drawHero(); });
+
+// Replay hero from stat card
+document.getElementById('stat-hero')?.addEventListener('click', () => drawHero(true));
+
+// Minimap active-section highlight
+const minimapLinks = document.querySelectorAll('#minimap a');
+const activeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      minimapLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -50% 0px' });
+document.querySelectorAll('main > header, main > section').forEach(el => {
+  if (el.id) activeObserver.observe(el);
+});
+
+// Theme toggle
+const themeBtn = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('kb-narration-theme');
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+themeBtn.textContent = document.documentElement.dataset.theme === 'dark' ? '☾' : '☀';
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('kb-narration-theme', next);
+  themeBtn.textContent = next === 'dark' ? '☾' : '☀';
+});
+
+// Keyboard nav
+const sectionIds = ['top','lifecycle','start','health','handover','async','sources','maturity','trends'];
+addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, button')) return;
+  const vy = document.documentElement.scrollTop + innerHeight * 0.3;
+  let cur = 0;
+  sectionIds.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= vy) cur = i;
+  });
+  let next = cur;
+  if (e.key === 'j' || e.key === 'ArrowDown') next = Math.min(sectionIds.length - 1, cur + 1);
+  else if (e.key === 'k' || e.key === 'ArrowUp') next = Math.max(0, cur - 1);
+  else if (e.key === 'g') next = 0;
+  else if (e.key === 'G') next = sectionIds.length - 1;
+  else return;
+  e.preventDefault();
+  document.getElementById(sectionIds[next]).scrollIntoView({ behavior: 'smooth' });
+});
+
+// Resize-aware redraw
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    drawHero();
+    if (vizDrawnOnce.has('sources')) drawSources();
+  }, 200);
+});
+</script>
+</body>
+</html>

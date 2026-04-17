@@ -1,0 +1,1144 @@
+<!doctype html>
+<!--
+  KB Narration: Jackfruit Seeds — The Undervalued Seed
+  Source: report/jackfruit-seed-comparison.md
+  Forked from: references/template.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jackfruit Seeds — The Undervalued Seed · KB Narration</title>
+<meta name="description" content="Jackfruit seeds are the lowest-calorie, lowest-fat seed you can eat, with a resistant starch profile no super seed can match.">
+<script src="https://unpkg.com/d3@7/dist/d3.min.js" defer></script>
+<style>
+/* ── palette ─────────────────────────────────────────────── */
+:root {
+  --bg:        oklch(0.16 0.010 260);
+  --bg-elev:   oklch(0.21 0.012 260);
+  --bg-hi:     oklch(0.26 0.014 260);
+  --fg:        oklch(0.95 0.004 260);
+  --fg-mid:    oklch(0.78 0.007 260);
+  --fg-dim:    oklch(0.55 0.010 260);
+  --border:    oklch(0.32 0.012 260);
+  --accent:    oklch(0.80 0.16 65);
+  --cool:      oklch(0.76 0.13 200);
+  --grow:      oklch(0.80 0.17 148);
+  --fade:      oklch(0.70 0.16 35);
+  --stop:      oklch(0.55 0.010 260);
+  --shadow:    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.25);
+}
+[data-theme="light"] {
+  --bg:      oklch(0.985 0.004 260);
+  --bg-elev: oklch(0.965 0.006 260);
+  --bg-hi:   oklch(0.92 0.008 260);
+  --fg:      oklch(0.22 0.012 260);
+  --fg-mid:  oklch(0.40 0.010 260);
+  --fg-dim:  oklch(0.55 0.010 260);
+  --border:  oklch(0.82 0.006 260);
+  --accent:  oklch(0.62 0.17 55);
+  --cool:    oklch(0.55 0.13 215);
+  --grow:    oklch(0.55 0.16 148);
+  --fade:    oklch(0.58 0.17 32);
+  --stop:    oklch(0.60 0.010 260);
+  --shadow:  0 1px 0 oklch(1 0 0 / 0.8) inset, 0 6px 18px oklch(0 0 0 / 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+html { scroll-behavior: smooth; }
+body {
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+h1, h2, h3 {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; line-height: 1.15; letter-spacing: -0.015em;
+  margin: 0 0 0.4em;
+}
+h1 { font-size: clamp(2.2rem, 5.5vw, 4rem); }
+h2 { font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin-top: 0.2em; }
+h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.5em; color: var(--fg-mid); }
+p { margin: 0 0 1em; color: var(--fg-mid); }
+p.lede { font-size: 1.15rem; color: var(--fg); max-width: 62ch; }
+em { color: var(--fg); font-style: italic; }
+strong { color: var(--fg); font-weight: 600; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid oklch(from var(--accent) l c h / 0.4); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+main { max-width: 980px; margin: 0 auto; padding: 4rem 1.5rem 6rem; position: relative; }
+section { margin: 4.5rem 0; opacity: 0; transform: translateY(20px); transition: opacity 0.9s ease-out, transform 0.9s ease-out; }
+section.visible { opacity: 1; transform: none; }
+section:first-of-type { margin-top: 2rem; }
+
+#progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cool));
+  width: 0%; z-index: 100;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 12px var(--accent);
+}
+
+#theme-toggle {
+  position: fixed; top: 1.2rem; right: 1.2rem;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-elev); color: var(--fg);
+  border: 1px solid var(--border);
+  font: 16px/1 system-ui; cursor: pointer;
+  z-index: 60; display: grid; place-items: center;
+  transition: background 0.2s, transform 0.2s;
+}
+#theme-toggle:hover { background: var(--bg-hi); transform: rotate(20deg); }
+#theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+#minimap {
+  position: fixed;
+  left: max(1.2rem, calc(50vw - 620px));
+  top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0.6rem;
+  z-index: 50; padding: 0.6rem 0;
+}
+#minimap a {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--fg-dim); border: none;
+  font-size: 0.78rem; font-family: -apple-system, system-ui, sans-serif;
+  border-radius: 4px;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+#minimap a::before {
+  content: ""; display: inline-block;
+  width: 16px; height: 2px; background: var(--border);
+  transition: width 0.3s, background 0.3s;
+}
+#minimap a:hover { color: var(--fg); }
+#minimap a.active { color: var(--accent); }
+#minimap a.active::before { width: 28px; background: var(--accent); }
+@media (max-width: 1200px) { #minimap { display: none; } }
+
+.hero { padding: 2rem 0 1rem; }
+.hero .date {
+  display: inline-block;
+  font: 600 0.72rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 0.4rem 0.7rem;
+  border: 1px solid oklch(from var(--accent) l c h / 0.4);
+  border-radius: 100px;
+  margin-bottom: 1.6rem;
+}
+.hero h1 { max-width: 18ch; }
+.hero .subtitle {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-style: italic; font-size: 1.25rem;
+  color: var(--fg-mid); max-width: 58ch;
+  margin: -0.2em 0 2rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem; margin: 2rem 0 1rem;
+}
+.stat {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.3rem;
+  box-shadow: var(--shadow);
+  transition: transform 0.3s, border-color 0.3s;
+}
+.stat:hover { transform: translateY(-2px); border-color: var(--accent); }
+.stat .value {
+  display: block;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; font-size: 2.6rem; line-height: 1;
+  letter-spacing: -0.03em; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.stat .label { display: block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--fg-dim); line-height: 1.4; }
+.stat.accent .value { color: var(--accent); }
+.stat.cool   .value { color: var(--cool); }
+.stat.grow   .value { color: var(--grow); }
+.stat.fade   .value { color: var(--fade); }
+
+.pullquote {
+  margin: 3rem 0;
+  padding: 1.8rem 2rem 1.8rem 2.3rem;
+  background: linear-gradient(135deg,
+    oklch(from var(--accent) l c h / 0.08),
+    oklch(from var(--accent) l c h / 0.02));
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+}
+.pullquote p {
+  font-size: 1.4rem; line-height: 1.35; margin: 0;
+  color: var(--fg); font-style: italic;
+}
+.pullquote cite {
+  display: block; margin-top: 0.9rem;
+  font-style: normal; font-size: 0.82rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--fg-dim);
+  font-family: -apple-system, system-ui, sans-serif;
+}
+
+.viz {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: var(--shadow);
+}
+.viz svg { display: block; width: 100%; height: auto; overflow: visible; }
+.viz .caption {
+  font-size: 0.82rem; color: var(--fg-dim);
+  margin-top: 1rem; padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.split-panels {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin: 1.5rem 0;
+}
+@media (max-width: 780px) { .split-panels { grid-template-columns: 1fr; } }
+.panel {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.4rem; box-shadow: var(--shadow);
+}
+.panel.wins { border-top: 3px solid var(--grow); }
+.panel.losses { border-top: 3px solid var(--fade); }
+.panel h3 {
+  margin-top: 0;
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 0.72rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--fg-dim); font-weight: 600;
+}
+.panel.wins h3 { color: var(--grow); }
+.panel.losses h3 { color: var(--fade); }
+.panel .item {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+  opacity: 0; transform: translateX(-10px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+.panel.losses .item { transform: translateX(10px); }
+.panel .item.revealed { opacity: 1; transform: none; }
+.panel .item:last-child { border-bottom: none; }
+.panel .item .metric {
+  font-family: "Source Serif 4", serif;
+  font-weight: 600; font-size: 1rem; color: var(--fg);
+}
+.panel .item .detail {
+  font-size: 0.85rem; color: var(--fg-dim); margin-top: 0.2rem;
+}
+
+.persona-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem; margin: 1.5rem 0;
+}
+.persona-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+  box-shadow: var(--shadow);
+  border-left: 3px solid var(--grow);
+}
+.persona-card.skip { border-left-color: var(--fade); }
+.persona-card .persona-title {
+  font-size: 0.92rem; color: var(--fg); font-weight: 600; margin-bottom: 0.3rem;
+}
+.persona-card .persona-why {
+  font-size: 0.82rem; color: var(--fg-dim); line-height: 1.45;
+}
+
+@keyframes pulse-seed {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+footer {
+  margin-top: 6rem; padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim); font-size: 0.8rem;
+  text-align: center;
+}
+footer a { color: var(--fg-dim); border-bottom-color: var(--border); }
+
+.kbd {
+  display: inline-block; padding: 0.1em 0.45em;
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px; border-radius: 4px;
+  font: 600 0.72em/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--fg-mid);
+}
+
+.source-list {
+  list-style: none; padding: 0; margin: 1rem 0;
+}
+.source-list li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem; color: var(--fg-mid);
+}
+.source-list li:last-child { border-bottom: none; }
+.source-list a { font-weight: 500; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  section { opacity: 1; transform: none; }
+  .panel .item { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<button id="theme-toggle" aria-label="Toggle theme" title="Toggle light / dark">&#9790;</button>
+
+<nav id="minimap" aria-label="Section navigation">
+  <a href="#top">Top</a>
+  <a href="#macro">Macros</a>
+  <a href="#tradeoffs">Tradeoffs</a>
+  <a href="#resistant-starch">Starch</a>
+  <a href="#reframe">Reframe</a>
+  <a href="#who-cares">Who Cares</a>
+  <a href="#sources">Sources</a>
+</nav>
+
+<main id="top">
+
+  <!-- ━━━ HERO ━━━ -->
+  <header class="hero">
+    <span class="date">17 Apr 2026</span>
+    <h1>184 kcal. The Seed Nobody Counts.</h1>
+    <p class="subtitle">Jackfruit seeds are the lowest-calorie, lowest-fat seed you can eat, with a resistant starch profile no super seed can match — and most of the world throws them away.</p>
+    <div class="viz">
+      <svg id="hero-viz" viewBox="0 0 900 420" aria-label="Jackfruit seed at 184 kcal surrounded by six super seeds at 486-584 kcal"></svg>
+      <div class="caption">Click the 184 stat to see how jackfruit repositions against starches instead of seeds.</div>
+    </div>
+    <p class="lede">Walk into any health food store and the seed hierarchy is settled: chia for fiber, hemp for protein, flax for omega-3. But the world's largest tree fruit produces seeds that get thrown away as agricultural waste — 15% of every harvest. Those seeds have been eaten for centuries across South and Southeast Asia. At 184 calories, 0.6g fat, and 30% resistant starch, they don't belong in the super seed category at all. They belong in a category of their own.</p>
+  </header>
+
+  <!-- ━━━ PULL QUOTE 1 ━━━ -->
+  <div class="pullquote">
+    <p>~30% of the starch is resistant starch — the kind that feeds gut bacteria and regulates blood sugar.</p>
+    <cite>— Resistant Starch Analysis</cite>
+  </div>
+
+  <!-- ━━━ MACRONUTRIENT COMPARISON ━━━ -->
+  <section id="macro">
+    <h2>The Macro Picture</h2>
+    <p>Seven seeds, four metrics. Jackfruit is in amber — everything else in teal. The gap isn't subtle: it's a different food category wearing a seed's name.</p>
+    <div class="viz">
+      <svg id="macro-viz" viewBox="0 0 900 620" aria-label="Grouped horizontal bar chart comparing macronutrients across 7 seeds"></svg>
+      <div class="caption">Per 100g raw. Jackfruit seeds highlighted in amber; super seeds in teal. Data from PMC, SnapCalorie, and USDA.</div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat accent">
+        <span class="value">0.6g</span>
+        <span class="label">Fat per 100g — 50x less than chia</span>
+      </div>
+      <div class="stat cool">
+        <span class="value">7g</span>
+        <span class="label">Protein — near chickpea, far from hemp's 32g</span>
+      </div>
+      <div class="stat accent">
+        <span class="value">184</span>
+        <span class="label">kcal — next lowest is chia at 486</span>
+      </div>
+      <div class="stat grow">
+        <span class="value">30%</span>
+        <span class="label">Resistant starch fraction — unique among seeds</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ PULL QUOTE 2 ━━━ -->
+  <div class="pullquote">
+    <p>The seeds carry 70% of the fruit's total antioxidant load — the part people eat has less than the part they throw away.</p>
+    <cite>— Antioxidant Profile</cite>
+  </div>
+
+  <!-- ━━━ WINS VS LOSSES ━━━ -->
+  <section id="tradeoffs">
+    <h2>Where Jackfruit Wins — and Loses</h2>
+    <p>The comparison isn't "which seed is best" — it's "what role does each play." Jackfruit seeds dominate on cost, calories, fat, and gut health compounds. They lose on protein, healthy fats, fiber volume, convenience, and availability.</p>
+    <div class="split-panels" id="split-panels">
+      <div class="panel wins">
+        <h3>Where Jackfruit Wins</h3>
+        <div class="item" data-delay="0">
+          <div class="metric">Calorie Density: 184 vs 486+</div>
+          <div class="detail">Lowest by a 300 kcal margin. The only seed that qualifies as low-calorie.</div>
+        </div>
+        <div class="item" data-delay="1">
+          <div class="metric">Fat Content: 0.6g vs 31-51g</div>
+          <div class="detail">A 50x difference from the next lowest. Effectively zero fat.</div>
+        </div>
+        <div class="item" data-delay="2">
+          <div class="metric">Resistant Starch: ~30%</div>
+          <div class="detail">No other seed has a meaningful resistant starch fraction.</div>
+        </div>
+        <div class="item" data-delay="3">
+          <div class="metric">Antioxidants: Berry-Level</div>
+          <div class="detail">Catechin, ferulic acid, epicatechin, rutin, gallic acid — polyphenols you'd expect from a berry.</div>
+        </div>
+        <div class="item" data-delay="4">
+          <div class="metric">Cost: Free (or close)</div>
+          <div class="detail">Agricultural waste in tropical regions. Compare to chia at $8-15/lb.</div>
+        </div>
+      </div>
+      <div class="panel losses">
+        <h3>Where Jackfruit Loses</h3>
+        <div class="item" data-delay="0">
+          <div class="metric">Protein: 7g vs 30-32g</div>
+          <div class="detail">Not even close. Hemp and pumpkin seeds are 4-5x higher.</div>
+        </div>
+        <div class="item" data-delay="1">
+          <div class="metric">Healthy Fats: None</div>
+          <div class="detail">No omega-3, no omega-6, no monounsaturated. Every other seed is a significant fat source.</div>
+        </div>
+        <div class="item" data-delay="2">
+          <div class="metric">Total Fiber: 3.8g vs 27-34g</div>
+          <div class="detail">Flax and chia dominate. Jackfruit's fiber story is specifically resistant starch.</div>
+        </div>
+        <div class="item" data-delay="3">
+          <div class="metric">Convenience: Cooking Required</div>
+          <div class="detail">20-30 min boiling or roasting. Every other seed is grab-and-go.</div>
+        </div>
+        <div class="item" data-delay="4">
+          <div class="metric">Availability: Tropical Only</div>
+          <div class="detail">Hard to find outside Asian groceries. Supply chain barely exists in the West.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ RESISTANT STARCH ━━━ -->
+  <section id="resistant-starch">
+    <h2>The Unique Play: Resistant Starch</h2>
+    <p>Resistant starch passes through to the large intestine undigested — it feeds beneficial gut bacteria, produces short-chain fatty acids, improves insulin sensitivity, and increases satiety. Most starchy foods have 1-5% resistant starch. Jackfruit seeds have 30%. This is the single most distinctive nutritional fact about jackfruit seeds.</p>
+    <div class="viz">
+      <svg id="rs-viz" viewBox="0 0 900 340" aria-label="Bar chart comparing resistant starch percentages across starchy foods"></svg>
+      <div class="caption">Resistant starch as % of total starch. Jackfruit seeds at ~30% are 3-10x higher than any common carb source.</div>
+    </div>
+  </section>
+
+  <!-- ━━━ PULL QUOTE 3 ━━━ -->
+  <div class="pullquote">
+    <p>15% of every jackfruit harvested. Agricultural waste.</p>
+    <cite>— The Sustainability Case</cite>
+  </div>
+
+  <!-- ━━━ REFRAME: SEEDS VS STARCHES ━━━ -->
+  <section id="reframe">
+    <h2>The Honest Reframe: Seeds vs Starches</h2>
+    <p>Jackfruit seeds aren't competing with super seeds. They're competing with potatoes, rice, chickpeas, and lentils. Against that comparison, they dominate on resistant starch and antioxidants while holding competitive protein. The scatter below makes the repositioning visual: super seeds live in the protein-rich, zero-RS zone. Starches cluster low on both axes. Jackfruit seeds sit alone in the upper quadrant — moderate protein, extraordinary resistant starch.</p>
+    <div class="viz">
+      <svg id="scatter-viz" viewBox="0 0 900 500" aria-label="Scatter plot: protein vs resistant starch, showing jackfruit seeds in a unique position"></svg>
+      <div class="caption">X = protein (g/100g), Y = resistant starch (% of total starch). Jackfruit seeds occupy a position no other common food reaches.</div>
+    </div>
+  </section>
+
+  <!-- ━━━ WHO SHOULD / SHOULDN'T CARE ━━━ -->
+  <section id="who-cares">
+    <h2>Who Should Care — and Who Shouldn't</h2>
+    <p>Jackfruit seeds aren't for everyone. That's the honest framing. Here's who benefits and who should look elsewhere.</p>
+    <h3 style="color: var(--grow); margin-top: 0.5em;">Should Care</h3>
+    <div class="persona-grid">
+      <div class="persona-card">
+        <div class="persona-title">People in Tropical Regions</div>
+        <div class="persona-why">You're literally throwing these away. The no-brainer case.</div>
+      </div>
+      <div class="persona-card">
+        <div class="persona-title">Blood Sugar Managers</div>
+        <div class="persona-why">The resistant starch profile is genuinely distinctive and evidence-backed for insulin sensitivity.</div>
+      </div>
+      <div class="persona-card">
+        <div class="persona-title">Low-Fat Dieters</div>
+        <div class="persona-why">The only seed that qualifies as a low-fat food. 0.6g per 100g.</div>
+      </div>
+      <div class="persona-card">
+        <div class="persona-title">Gut Health Optimizers</div>
+        <div class="persona-why">Resistant starch + prebiotic compounds is a strong combination for microbiome health.</div>
+      </div>
+      <div class="persona-card">
+        <div class="persona-title">Sustainability Advocates</div>
+        <div class="persona-why">Eating agricultural waste that's nutritionally dense. The sustainability argument writes itself.</div>
+      </div>
+    </div>
+    <h3 style="color: var(--fade); margin-top: 2em;">Shouldn't Pivot</h3>
+    <div class="persona-grid">
+      <div class="persona-card skip">
+        <div class="persona-title">Protein Optimizers</div>
+        <div class="persona-why">Eat hemp or pumpkin seeds instead. 30-32g vs 7g — not competitive.</div>
+      </div>
+      <div class="persona-card skip">
+        <div class="persona-title">Omega-3 Seekers</div>
+        <div class="persona-why">Eat chia or flax instead. Jackfruit seeds have zero omega-3.</div>
+      </div>
+      <div class="persona-card skip">
+        <div class="persona-title">Convenience Seekers</div>
+        <div class="persona-why">The 20-30 min cooking requirement is a real daily barrier.</div>
+      </div>
+      <div class="persona-card skip">
+        <div class="persona-title">Outside Tropical Regions</div>
+        <div class="persona-why">Availability makes this impractical as a daily staple — for now.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ SOURCES ━━━ -->
+  <section id="sources">
+    <h2>Sources</h2>
+    <ul class="source-list">
+      <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10420861/">PMC: Physicochemical properties of jackfruit seeds (Cameroon)</a> — minerals, macronutrients, dry matter analysis</li>
+      <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6339770/">PMC: Nutritional and Health Benefits of Jackfruit</a> — amino acids, starch properties, health mechanisms</li>
+      <li><a href="https://www.sciencedirect.com/science/article/pii/S2666154325000638">ScienceDirect: Comprehensive review on jackfruit seeds</a> — bioactive compounds, industrial applications</li>
+      <li><a href="https://www.healthline.com/nutrition/jackfruit-seeds">Healthline: Jackfruit Seeds Benefits, Concerns, and Uses</a> — consumer-facing summary</li>
+      <li><a href="https://www.snapcalorie.com/nutrition/jackfruit_seed_nutrition.html">SnapCalorie: Jackfruit seed nutrition data</a> — per-100g macros</li>
+      <li><a href="https://link.springer.com/article/10.1186/s43014-023-00170-z">Springer Nature: Jackfruit seed potentials review</a> — industrial applications</li>
+      <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10743863/">PMC: Efficacy of jackfruit components in disease prevention</a> — scoping review of health evidence</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      Narration of <a href="../report/jackfruit-seed-comparison.md">jackfruit-seed-comparison.md</a>
+      · rendered by <code>/kb-narration</code> · d3 v7<br>
+      Use <span class="kbd">j</span> <span class="kbd">k</span> or <span class="kbd">&#8595;</span> <span class="kbd">&#8593;</span> to move between sections.
+    </p>
+  </footer>
+</main>
+
+<script>
+/* ────────────────────────────────────────────────────────────────
+ * DATA
+ * ──────────────────────────────────────────────────────────────── */
+const DATA = {
+  seeds: [
+    { name: 'Jackfruit', cal: 184, protein: 7, fat: 0.6, fiber: 3.8, rs: 30, isJackfruit: true },
+    { name: 'Hemp', cal: 553, protein: 32, fat: 49, fiber: 4, rs: 0, isJackfruit: false },
+    { name: 'Chia', cal: 486, protein: 17, fat: 31, fiber: 34, rs: 0, isJackfruit: false },
+    { name: 'Flax', cal: 534, protein: 18, fat: 42, fiber: 27, rs: 0, isJackfruit: false },
+    { name: 'Pumpkin', cal: 559, protein: 30, fat: 49, fiber: 6, rs: 0, isJackfruit: false },
+    { name: 'Sunflower', cal: 584, protein: 21, fat: 51, fiber: 9, rs: 0, isJackfruit: false },
+    { name: 'Sesame', cal: 573, protein: 18, fat: 50, fiber: 12, rs: 0, isJackfruit: false }
+  ],
+  heroSeeds: [
+    { name: 'Hemp', cal: 553, color: 'var(--cool)', angle: 0 },
+    { name: 'Chia', cal: 486, color: 'var(--grow)', angle: 60 },
+    { name: 'Flax', cal: 534, color: 'var(--fade)', angle: 120 },
+    { name: 'Pumpkin', cal: 559, color: 'var(--cool)', angle: 180 },
+    { name: 'Sunflower', cal: 584, color: 'var(--grow)', angle: 240 },
+    { name: 'Sesame', cal: 573, color: 'var(--fade)', angle: 300 }
+  ],
+  resistantStarch: [
+    { name: 'Jackfruit Seed', rs: 30, isJackfruit: true },
+    { name: 'Chickpea', rs: 7.5, isJackfruit: false },
+    { name: 'Lentil', rs: 4, isJackfruit: false },
+    { name: 'Potato', rs: 4, isJackfruit: false },
+    { name: 'Sweet Potato', rs: 2.5, isJackfruit: false },
+    { name: 'Brown Rice', rs: 2, isJackfruit: false }
+  ],
+  scatter: [
+    { name: 'Jackfruit Seed', protein: 7, rs: 30, group: 'jackfruit' },
+    { name: 'Potato', protein: 2, rs: 4, group: 'starch' },
+    { name: 'Sweet Potato', protein: 1.6, rs: 2.5, group: 'starch' },
+    { name: 'Chickpea', protein: 8.9, rs: 7.5, group: 'starch' },
+    { name: 'Lentil', protein: 9, rs: 4, group: 'starch' },
+    { name: 'Brown Rice', protein: 2.6, rs: 2, group: 'starch' },
+    { name: 'Hemp', protein: 32, rs: 0, group: 'seed' },
+    { name: 'Chia', protein: 17, rs: 0, group: 'seed' },
+    { name: 'Flax', protein: 18, rs: 0, group: 'seed' },
+    { name: 'Pumpkin', protein: 30, rs: 0, group: 'seed' },
+    { name: 'Sunflower', protein: 21, rs: 0, group: 'seed' },
+    { name: 'Sesame', protein: 18, rs: 0, group: 'seed' }
+  ]
+};
+
+/* ────────────────────────────────────────────────────────────────
+ * HELPERS
+ * ──────────────────────────────────────────────────────────────── */
+const cs = getComputedStyle(document.documentElement);
+function cssVar(v) { return cs.getPropertyValue(v).trim(); }
+const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function dur(ms) { return prefersReduced ? 0 : ms; }
+function del(ms) { return prefersReduced ? 0 : ms; }
+
+/* ────────────────────────────────────────────────────────────────
+ * HERO VIZ
+ * ──────────────────────────────────────────────────────────────── */
+let heroExpanded = false;
+
+function drawHero() {
+  const svg = d3.select('#hero-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 420;
+  const cx = W / 2, cy = H / 2 - 10;
+  const ringR = 155;
+
+  // connector lines
+  DATA.heroSeeds.forEach(s => {
+    const rad = (s.angle - 90) * Math.PI / 180;
+    svg.append('line')
+      .attr('x1', cx).attr('y1', cy)
+      .attr('x2', cx + ringR * Math.cos(rad))
+      .attr('y2', cy + ringR * Math.sin(rad))
+      .attr('stroke', 'var(--border)')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,4')
+      .attr('class', 'connector');
+  });
+
+  // surrounding seed circles
+  const seedGs = svg.selectAll('g.seed').data(DATA.heroSeeds).join('g')
+    .attr('class', 'seed')
+    .attr('transform', d => {
+      const rad = (d.angle - 90) * Math.PI / 180;
+      return `translate(${cx + ringR * Math.cos(rad)}, ${cy + ringR * Math.sin(rad)})`;
+    });
+
+  seedGs.append('circle')
+    .attr('r', 0)
+    .attr('fill', d => d.color)
+    .attr('fill-opacity', 0.15)
+    .attr('stroke', d => d.color)
+    .attr('stroke-width', 1.5)
+    .transition().delay((_, i) => del(200 + i * 80)).duration(dur(500))
+    .attr('r', 32);
+
+  seedGs.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '-0.2em')
+    .attr('fill', 'var(--fg)')
+    .attr('font-size', '11px')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .attr('opacity', 0)
+    .text(d => d.name)
+    .transition().delay((_, i) => del(400 + i * 80)).duration(dur(400))
+    .attr('opacity', 1);
+
+  seedGs.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '1.1em')
+    .attr('fill', 'var(--fg-dim)')
+    .attr('font-size', '10px')
+    .attr('font-family', '"JetBrains Mono", "SF Mono", ui-monospace, monospace')
+    .attr('font-variant-numeric', 'tabular-nums')
+    .attr('opacity', 0)
+    .text(d => d.cal + ' kcal')
+    .transition().delay((_, i) => del(400 + i * 80)).duration(dur(400))
+    .attr('opacity', 1);
+
+  // faded range label
+  svg.append('text')
+    .attr('x', cx).attr('y', H - 16)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg-dim)')
+    .attr('font-size', '14px')
+    .attr('font-family', '"Source Serif 4", Georgia, serif')
+    .attr('font-style', 'italic')
+    .attr('opacity', 0)
+    .text('Super seeds: 486 \u2013 584 kcal')
+    .transition().delay(del(900)).duration(dur(600))
+    .attr('opacity', 0.6);
+
+  // center jackfruit seed (SVG oval)
+  const jfGroup = svg.append('g')
+    .attr('transform', `translate(${cx}, ${cy})`)
+    .attr('class', 'jf-center')
+    .style('cursor', 'pointer');
+
+  jfGroup.append('ellipse')
+    .attr('rx', 0).attr('ry', 0)
+    .attr('fill', 'var(--accent)')
+    .attr('fill-opacity', 0.2)
+    .attr('stroke', 'var(--accent)')
+    .attr('stroke-width', 2)
+    .style('animation', prefersReduced ? 'none' : 'pulse-seed 3s ease-in-out infinite')
+    .transition().delay(del(100)).duration(dur(700))
+    .attr('rx', 52).attr('ry', 62);
+
+  // hero number
+  jfGroup.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '-0.1em')
+    .attr('fill', 'var(--accent)')
+    .attr('font-size', '44px')
+    .attr('font-family', '"Source Serif 4", Georgia, serif')
+    .attr('font-weight', '600')
+    .attr('font-variant-numeric', 'tabular-nums')
+    .attr('opacity', 0)
+    .text('184')
+    .transition().delay(del(500)).duration(dur(500))
+    .attr('opacity', 1);
+
+  jfGroup.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '1.8em')
+    .attr('fill', 'var(--accent)')
+    .attr('font-size', '13px')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .attr('font-weight', '600')
+    .attr('letter-spacing', '0.08em')
+    .attr('opacity', 0)
+    .text('KCAL')
+    .transition().delay(del(600)).duration(dur(400))
+    .attr('opacity', 0.8);
+
+  // pay-off click handler
+  jfGroup.on('click', () => {
+    heroExpanded = !heroExpanded;
+    if (heroExpanded) {
+      // shrink surrounding seeds, grow center
+      svg.selectAll('g.seed circle')
+        .transition().duration(dur(500))
+        .attr('r', 20);
+      svg.selectAll('g.seed text')
+        .transition().duration(dur(300))
+        .attr('opacity', 0.3);
+      jfGroup.select('ellipse')
+        .transition().duration(dur(500))
+        .attr('rx', 65).attr('ry', 76);
+
+      // fade in starch comparison below
+      const starchData = [
+        { name: 'Jackfruit', cal: 184, rs: '30%' },
+        { name: 'Potato', cal: 87, rs: '3-5%' },
+        { name: 'Chickpea', cal: 164, rs: '5-10%' },
+        { name: 'Rice', cal: 112, rs: '1-3%' }
+      ];
+      const starchG = svg.append('g')
+        .attr('class', 'starch-compare')
+        .attr('transform', `translate(${cx - 180}, ${H - 55})`)
+        .attr('opacity', 0);
+
+      starchData.forEach((d, i) => {
+        const x = i * 95;
+        starchG.append('text')
+          .attr('x', x).attr('y', 0)
+          .attr('text-anchor', 'middle')
+          .attr('fill', d.name === 'Jackfruit' ? 'var(--accent)' : 'var(--fg-dim)')
+          .attr('font-size', '11px')
+          .attr('font-weight', d.name === 'Jackfruit' ? '600' : '400')
+          .text(d.name);
+        starchG.append('text')
+          .attr('x', x).attr('y', 16)
+          .attr('text-anchor', 'middle')
+          .attr('fill', d.name === 'Jackfruit' ? 'var(--accent)' : 'var(--fg-mid)')
+          .attr('font-size', '13px')
+          .attr('font-family', '"Source Serif 4", Georgia, serif')
+          .attr('font-weight', '600')
+          .text(d.rs + ' RS');
+      });
+
+      starchG.append('text')
+        .attr('x', 140).attr('y', -16)
+        .attr('text-anchor', 'middle')
+        .attr('fill', 'var(--fg-dim)')
+        .attr('font-size', '10px')
+        .attr('font-style', 'italic')
+        .text('vs starches \u2014 resistant starch %');
+
+      starchG.transition().duration(dur(600)).attr('opacity', 1);
+    } else {
+      // restore
+      svg.selectAll('g.seed circle')
+        .transition().duration(dur(500))
+        .attr('r', 32);
+      svg.selectAll('g.seed text')
+        .transition().duration(dur(300))
+        .attr('opacity', 1);
+      jfGroup.select('ellipse')
+        .transition().duration(dur(500))
+        .attr('rx', 52).attr('ry', 62);
+      svg.selectAll('.starch-compare')
+        .transition().duration(dur(300))
+        .attr('opacity', 0)
+        .remove();
+    }
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * MACRONUTRIENT BAR CHART
+ * ──────────────────────────────────────────────────────────────── */
+function drawMacro() {
+  const svg = d3.select('#macro-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 620;
+  const margin = { top: 30, right: 90, bottom: 30, left: 100 };
+  const iw = W - margin.left - margin.right;
+  const ih = H - margin.top - margin.bottom;
+
+  const metrics = [
+    { key: 'cal', label: 'Calories (kcal)', max: 600 },
+    { key: 'protein', label: 'Protein (g)', max: 35 },
+    { key: 'fat', label: 'Fat (g)', max: 55 },
+    { key: 'fiber', label: 'Fiber (g)', max: 36 }
+  ];
+
+  const seeds = DATA.seeds;
+  const groupH = ih / metrics.length;
+  const barH = (groupH - 20) / seeds.length;
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+  metrics.forEach((m, mi) => {
+    const gy = mi * groupH;
+    const x = d3.scaleLinear().domain([0, m.max]).range([0, iw]);
+
+    // metric label
+    g.append('text')
+      .attr('x', -8).attr('y', gy + 12)
+      .attr('text-anchor', 'end')
+      .attr('fill', 'var(--fg)')
+      .attr('font-size', '12px')
+      .attr('font-weight', '600')
+      .text(m.label);
+
+    // bars
+    seeds.forEach((s, si) => {
+      const by = gy + 20 + si * barH;
+      const fillColor = s.isJackfruit ? 'var(--accent)' : 'var(--cool)';
+
+      g.append('rect')
+        .attr('x', 0).attr('y', by)
+        .attr('height', Math.max(barH - 2, 4))
+        .attr('width', 0)
+        .attr('fill', fillColor)
+        .attr('fill-opacity', s.isJackfruit ? 0.35 : 0.15)
+        .attr('stroke', fillColor)
+        .attr('stroke-width', 1)
+        .attr('rx', 2)
+        .transition().delay(del(mi * 120 + si * 50)).duration(dur(600))
+        .attr('width', x(s[m.key]));
+
+      // seed label (only for first metric group)
+      if (mi === 0) {
+        g.append('text')
+          .attr('x', -8).attr('y', by + barH / 2 + 1)
+          .attr('text-anchor', 'end')
+          .attr('fill', s.isJackfruit ? 'var(--accent)' : 'var(--fg-dim)')
+          .attr('font-size', '10px')
+          .attr('font-weight', s.isJackfruit ? '600' : '400')
+          .attr('dominant-baseline', 'middle')
+          .text(s.name);
+      }
+
+      // value label
+      g.append('text')
+        .attr('x', x(s[m.key]) + 6).attr('y', by + barH / 2 + 1)
+        .attr('fill', s.isJackfruit ? 'var(--accent)' : 'var(--fg-dim)')
+        .attr('font-size', '10px')
+        .attr('font-variant-numeric', 'tabular-nums')
+        .attr('dominant-baseline', 'middle')
+        .attr('opacity', 0)
+        .text(m.key === 'cal' ? s[m.key] : s[m.key] + 'g')
+        .transition().delay(del(mi * 120 + si * 50 + 400)).duration(dur(300))
+        .attr('opacity', 1);
+    });
+
+    // separator line
+    if (mi < metrics.length - 1) {
+      g.append('line')
+        .attr('x1', 0).attr('y1', gy + groupH - 2)
+        .attr('x2', iw).attr('y2', gy + groupH - 2)
+        .attr('stroke', 'var(--border)')
+        .attr('stroke-dasharray', '2,3');
+    }
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * RESISTANT STARCH BAR CHART
+ * ──────────────────────────────────────────────────────────────── */
+function drawResistantStarch() {
+  const svg = d3.select('#rs-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 340;
+  const margin = { top: 20, right: 60, bottom: 30, left: 130 };
+  const iw = W - margin.left - margin.right;
+  const ih = H - margin.top - margin.bottom;
+
+  const data = DATA.resistantStarch;
+  const y = d3.scaleBand().domain(data.map(d => d.name)).range([0, ih]).padding(0.25);
+  const x = d3.scaleLinear().domain([0, 35]).range([0, iw]);
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+  // gridlines
+  [5, 10, 15, 20, 25, 30].forEach(v => {
+    g.append('line')
+      .attr('x1', x(v)).attr('y1', 0)
+      .attr('x2', x(v)).attr('y2', ih)
+      .attr('stroke', 'var(--border)')
+      .attr('stroke-dasharray', '2,3');
+    g.append('text')
+      .attr('x', x(v)).attr('y', ih + 18)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--fg-dim)')
+      .attr('font-size', '10px')
+      .text(v + '%');
+  });
+
+  data.forEach((d, i) => {
+    const fillColor = d.isJackfruit ? 'var(--accent)' : 'var(--cool)';
+
+    // label
+    g.append('text')
+      .attr('x', -10).attr('y', y(d.name) + y.bandwidth() / 2)
+      .attr('text-anchor', 'end')
+      .attr('fill', d.isJackfruit ? 'var(--accent)' : 'var(--fg-mid)')
+      .attr('font-size', '13px')
+      .attr('font-weight', d.isJackfruit ? '600' : '400')
+      .attr('dominant-baseline', 'middle')
+      .text(d.name);
+
+    // bar
+    g.append('rect')
+      .attr('x', 0).attr('y', y(d.name))
+      .attr('height', y.bandwidth())
+      .attr('width', 0)
+      .attr('fill', fillColor)
+      .attr('fill-opacity', d.isJackfruit ? 0.35 : 0.15)
+      .attr('stroke', fillColor)
+      .attr('stroke-width', 1.5)
+      .attr('rx', 3)
+      .transition().delay(del(i * 80)).duration(dur(700))
+      .attr('width', x(d.rs));
+
+    // value
+    g.append('text')
+      .attr('x', x(d.rs) + 8)
+      .attr('y', y(d.name) + y.bandwidth() / 2)
+      .attr('fill', d.isJackfruit ? 'var(--accent)' : 'var(--fg-dim)')
+      .attr('font-size', '13px')
+      .attr('font-weight', '600')
+      .attr('font-variant-numeric', 'tabular-nums')
+      .attr('dominant-baseline', 'middle')
+      .attr('opacity', 0)
+      .text(d.rs + '%')
+      .transition().delay(del(i * 80 + 500)).duration(dur(300))
+      .attr('opacity', 1);
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * SCATTER: PROTEIN VS RESISTANT STARCH
+ * ──────────────────────────────────────────────────────────────── */
+function drawScatter() {
+  const svg = d3.select('#scatter-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 500;
+  const margin = { top: 30, right: 40, bottom: 50, left: 60 };
+  const iw = W - margin.left - margin.right;
+  const ih = H - margin.top - margin.bottom;
+
+  const data = DATA.scatter;
+  const x = d3.scaleLinear().domain([0, 35]).range([0, iw]);
+  const y = d3.scaleLinear().domain([0, 35]).range([ih, 0]);
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+  // gridlines
+  [5, 10, 15, 20, 25, 30].forEach(v => {
+    g.append('line').attr('x1', x(v)).attr('y1', 0).attr('x2', x(v)).attr('y2', ih)
+      .attr('stroke', 'var(--border)').attr('stroke-dasharray', '2,3');
+    g.append('line').attr('x1', 0).attr('y1', y(v)).attr('x2', iw).attr('y2', y(v))
+      .attr('stroke', 'var(--border)').attr('stroke-dasharray', '2,3');
+  });
+
+  // axis labels
+  g.append('text')
+    .attr('x', iw / 2).attr('y', ih + 38)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg-mid)')
+    .attr('font-size', '13px')
+    .text('Protein (g / 100g)');
+
+  g.append('text')
+    .attr('x', -ih / 2).attr('y', -42)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg-mid)')
+    .attr('font-size', '13px')
+    .attr('transform', 'rotate(-90)')
+    .text('Resistant Starch (% of total starch)');
+
+  // zone labels
+  g.append('text')
+    .attr('x', x(25)).attr('y', y(1))
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--cool)')
+    .attr('font-size', '11px')
+    .attr('font-style', 'italic')
+    .attr('opacity', 0.6)
+    .text('Super Seeds: high protein, no RS');
+
+  g.append('text')
+    .attr('x', x(5)).attr('y', y(8))
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg-dim)')
+    .attr('font-size', '11px')
+    .attr('font-style', 'italic')
+    .attr('opacity', 0.6)
+    .text('Starches: low both');
+
+  // data points
+  const colorMap = {
+    jackfruit: 'var(--accent)',
+    starch: 'var(--fg-dim)',
+    seed: 'var(--cool)'
+  };
+  const rMap = { jackfruit: 14, starch: 8, seed: 7 };
+
+  data.forEach((d, i) => {
+    const pg = g.append('g')
+      .attr('transform', `translate(${x(d.protein)}, ${y(d.rs)})`);
+
+    pg.append('circle')
+      .attr('r', 0)
+      .attr('fill', colorMap[d.group])
+      .attr('fill-opacity', d.group === 'jackfruit' ? 0.35 : 0.15)
+      .attr('stroke', colorMap[d.group])
+      .attr('stroke-width', d.group === 'jackfruit' ? 2 : 1)
+      .transition().delay(del(i * 60)).duration(dur(500))
+      .attr('r', rMap[d.group]);
+
+    // label
+    const labelOffset = d.group === 'jackfruit' ? -20 : (d.rs > 5 ? -14 : 14);
+    pg.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('y', labelOffset)
+      .attr('fill', d.group === 'jackfruit' ? 'var(--accent)' : 'var(--fg-dim)')
+      .attr('font-size', d.group === 'jackfruit' ? '13px' : '10px')
+      .attr('font-weight', d.group === 'jackfruit' ? '600' : '400')
+      .attr('opacity', 0)
+      .text(d.name)
+      .transition().delay(del(i * 60 + 300)).duration(dur(400))
+      .attr('opacity', d.group === 'jackfruit' ? 1 : 0.8);
+  });
+
+  // highlight jackfruit label with RS value
+  const jf = data.find(d => d.group === 'jackfruit');
+  g.append('text')
+    .attr('x', x(jf.protein)).attr('y', y(jf.rs) - 34)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--accent)')
+    .attr('font-size', '18px')
+    .attr('font-family', '"Source Serif 4", Georgia, serif')
+    .attr('font-weight', '600')
+    .attr('opacity', 0)
+    .text('30% RS')
+    .transition().delay(del(800)).duration(dur(500))
+    .attr('opacity', 1);
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * SPLIT PANEL REVEAL
+ * ──────────────────────────────────────────────────────────────── */
+function revealPanelItems() {
+  const items = document.querySelectorAll('#split-panels .item');
+  items.forEach((el, i) => {
+    const delay = parseInt(el.dataset.delay || 0) * 120;
+    setTimeout(() => el.classList.add('revealed'), prefersReduced ? 0 : delay);
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * CHROME
+ * ──────────────────────────────────────────────────────────────── */
+
+// reading progress
+const progressEl = document.getElementById('progress');
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  progressEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+}, { passive: true });
+
+// section entry + lazy viz draw
+const vizDrawnOnce = new Set();
+const entryObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('visible');
+    const id = e.target.id;
+    if (id === 'macro' && !vizDrawnOnce.has(id)) { drawMacro(); vizDrawnOnce.add(id); }
+    if (id === 'tradeoffs' && !vizDrawnOnce.has(id)) { revealPanelItems(); vizDrawnOnce.add(id); }
+    if (id === 'resistant-starch' && !vizDrawnOnce.has(id)) { drawResistantStarch(); vizDrawnOnce.add(id); }
+    if (id === 'reframe' && !vizDrawnOnce.has(id)) { drawScatter(); vizDrawnOnce.add(id); }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -100px 0px' });
+document.querySelectorAll('section').forEach(s => entryObserver.observe(s));
+
+// hero always draws on load
+addEventListener('DOMContentLoaded', () => { drawHero(); });
+
+// minimap active-section highlight
+const minimapLinks = document.querySelectorAll('#minimap a');
+const activeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      minimapLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -50% 0px' });
+document.querySelectorAll('main > header, main > section').forEach(el => {
+  if (el.id) activeObserver.observe(el);
+});
+
+// theme toggle
+const themeBtn = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('kb-narration-theme');
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+themeBtn.textContent = document.documentElement.dataset.theme === 'dark' ? '\u263E' : '\u2600';
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('kb-narration-theme', next);
+  themeBtn.textContent = next === 'dark' ? '\u263E' : '\u2600';
+});
+
+// keyboard nav
+const sectionIds = ['top', 'macro', 'tradeoffs', 'resistant-starch', 'reframe', 'who-cares', 'sources'];
+addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, button')) return;
+  const vy = document.documentElement.scrollTop + innerHeight * 0.3;
+  let cur = 0;
+  sectionIds.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= vy) cur = i;
+  });
+  let next = cur;
+  if (e.key === 'j' || e.key === 'ArrowDown') next = Math.min(sectionIds.length - 1, cur + 1);
+  else if (e.key === 'k' || e.key === 'ArrowUp') next = Math.max(0, cur - 1);
+  else if (e.key === 'g') next = 0;
+  else if (e.key === 'G') next = sectionIds.length - 1;
+  else return;
+  e.preventDefault();
+  document.getElementById(sectionIds[next]).scrollIntoView({ behavior: 'smooth' });
+});
+
+// resize-aware redraw
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    drawHero();
+    if (vizDrawnOnce.has('macro')) drawMacro();
+    if (vizDrawnOnce.has('resistant-starch')) drawResistantStarch();
+    if (vizDrawnOnce.has('reframe')) drawScatter();
+  }, 200);
+});
+</script>
+</body>
+</html>

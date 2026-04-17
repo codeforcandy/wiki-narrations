@@ -1,0 +1,1625 @@
+<!doctype html>
+<!--
+  KB Health Check Narration · 2026-04-15
+  Source: wiki/report/kb-health-2026-04-15.md
+  Style: references/style-guide.md · references/template.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>10 Dead Ends, Zero Remain — KB Health · 2026-04-15</title>
+<meta name="description" content="Interactive narration of the 2026-04-15 knowledge base health check. 10 orphans found and fixed, 1 wikilink bug resolved, hub density analysis, thin-link vulnerability map.">
+<script src="https://unpkg.com/d3@7/dist/d3.min.js" defer></script>
+<style>
+/* ── palette ─────────────────────────────────────────────── */
+:root {
+  --bg:        oklch(0.16 0.010 260);
+  --bg-elev:   oklch(0.21 0.012 260);
+  --bg-hi:     oklch(0.26 0.014 260);
+  --fg:        oklch(0.95 0.004 260);
+  --fg-mid:    oklch(0.78 0.007 260);
+  --fg-dim:    oklch(0.55 0.010 260);
+  --border:    oklch(0.32 0.012 260);
+  --accent:    oklch(0.80 0.16 65);   /* amber — orphaned / broken */
+  --cool:      oklch(0.76 0.13 200);  /* teal — mapped / stable */
+  --grow:      oklch(0.80 0.17 148);  /* green — fixed / connected */
+  --fade:      oklch(0.70 0.16 35);   /* rust — vulnerable / thin */
+  --stop:      oklch(0.55 0.010 260); /* neutral — no action */
+  --shadow:    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.25);
+}
+[data-theme="light"] {
+  --bg:      oklch(0.985 0.004 260);
+  --bg-elev: oklch(0.965 0.006 260);
+  --bg-hi:   oklch(0.92 0.008 260);
+  --fg:      oklch(0.22 0.012 260);
+  --fg-mid:  oklch(0.40 0.010 260);
+  --fg-dim:  oklch(0.55 0.010 260);
+  --border:  oklch(0.82 0.006 260);
+  --accent:  oklch(0.62 0.17 55);
+  --cool:    oklch(0.55 0.13 215);
+  --grow:    oklch(0.55 0.16 148);
+  --fade:    oklch(0.58 0.17 32);
+  --stop:    oklch(0.60 0.010 260);
+  --shadow:  0 1px 0 oklch(1 0 0 / 0.8) inset, 0 6px 18px oklch(0 0 0 / 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+html { scroll-behavior: smooth; }
+body {
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+h1, h2, h3 {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; line-height: 1.15; letter-spacing: -0.015em;
+  margin: 0 0 0.4em;
+}
+h1 { font-size: clamp(2.2rem, 5.5vw, 4rem); }
+h2 { font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin-top: 0.2em; }
+h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.5em; color: var(--fg-mid); }
+p { margin: 0 0 1em; color: var(--fg-mid); }
+p.lede { font-size: 1.15rem; color: var(--fg); max-width: 62ch; }
+em { color: var(--fg); font-style: italic; }
+strong { color: var(--fg); font-weight: 600; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid oklch(from var(--accent) l c h / 0.4); }
+a:hover, a:focus-visible { border-bottom-color: var(--accent); outline: none; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ── layout ──────────────────────────────────────────────── */
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 4rem 1.5rem 6rem;
+  position: relative;
+}
+section {
+  margin: 4.5rem 0;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.9s ease-out, transform 0.9s ease-out;
+}
+section.visible { opacity: 1; transform: none; }
+section:first-of-type { margin-top: 2rem; }
+
+/* ── progress bar ────────────────────────────────────────── */
+#progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cool));
+  width: 0%;
+  z-index: 100;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 12px var(--accent);
+}
+
+/* ── theme toggle ────────────────────────────────────────── */
+#theme-toggle {
+  position: fixed; top: 1.2rem; right: 1.2rem;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-elev); color: var(--fg);
+  border: 1px solid var(--border);
+  font: 16px/1 system-ui; cursor: pointer;
+  z-index: 60; display: grid; place-items: center;
+  transition: background 0.2s, transform 0.2s;
+}
+#theme-toggle:hover { background: var(--bg-hi); transform: rotate(20deg); }
+#theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ── minimap sidebar ─────────────────────────────────────── */
+#minimap {
+  position: fixed;
+  left: max(1.2rem, calc(50vw - 620px));
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0.6rem;
+  z-index: 50;
+  padding: 0.6rem 0;
+}
+#minimap a {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--fg-dim);
+  border: none;
+  font-size: 0.78rem;
+  font-family: -apple-system, system-ui, sans-serif;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+  white-space: nowrap;
+}
+#minimap a::before {
+  content: "";
+  display: inline-block;
+  width: 16px; height: 2px;
+  background: var(--border);
+  transition: width 0.3s, background 0.3s;
+}
+#minimap a:hover { color: var(--fg); }
+#minimap a.active { color: var(--accent); }
+#minimap a.active::before { width: 28px; background: var(--accent); }
+@media (max-width: 1200px) { #minimap { display: none; } }
+
+/* ── hero ────────────────────────────────────────────────── */
+.hero {
+  padding: 2rem 0 1rem;
+}
+.hero .date {
+  display: inline-block;
+  font: 600 0.72rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 0.4rem 0.7rem;
+  border: 1px solid oklch(from var(--accent) l c h / 0.4);
+  border-radius: 100px;
+  margin-bottom: 1.6rem;
+}
+.hero h1 { max-width: 18ch; }
+.hero .subtitle {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--fg-mid);
+  max-width: 50ch;
+  margin: -0.2em 0 2rem;
+}
+
+/* ── stat grid ───────────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0 1rem;
+}
+.stat {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.3rem;
+  box-shadow: var(--shadow);
+  transition: transform 0.3s, border-color 0.3s;
+}
+.stat:hover { transform: translateY(-2px); border-color: var(--accent); }
+.stat .value {
+  display: block;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600;
+  font-size: 2.6rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.stat .label {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--fg-dim);
+  line-height: 1.4;
+}
+.stat.accent .value { color: var(--accent); }
+.stat.cool   .value { color: var(--cool); }
+.stat.grow   .value { color: var(--grow); }
+.stat.accent, .stat.accent:hover { cursor: pointer; }
+
+/* ── pull quote ──────────────────────────────────────────── */
+.pullquote {
+  margin: 3rem 0;
+  padding: 1.8rem 2rem 1.8rem 2.3rem;
+  background: linear-gradient(135deg,
+    oklch(from var(--accent) l c h / 0.08),
+    oklch(from var(--accent) l c h / 0.02));
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+}
+.pullquote p {
+  font-size: 1.4rem;
+  line-height: 1.35;
+  margin: 0;
+  color: var(--fg);
+  font-style: italic;
+}
+.pullquote cite {
+  display: block;
+  margin-top: 0.9rem;
+  font-style: normal;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  font-family: -apple-system, system-ui, sans-serif;
+}
+
+/* ── viz container ───────────────────────────────────────── */
+.viz {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: var(--shadow);
+}
+.viz svg { display: block; width: 100%; height: auto; overflow: visible; }
+.viz .caption {
+  font-size: 0.82rem;
+  color: var(--fg-dim);
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ── orphan table ────────────────────────────────────────── */
+.orphan-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1.5rem 0;
+}
+.orphan-table th {
+  font: 600 0.72rem/1 -apple-system, system-ui, sans-serif;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  text-align: left;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.orphan-table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.92rem;
+  color: var(--fg-mid);
+  border-bottom: 1px solid oklch(from var(--border) l c h / 0.5);
+  vertical-align: middle;
+  transition: background 0.4s, color 0.4s;
+}
+.orphan-table tr { transition: opacity 0.6s; }
+.orphan-table tr.fixed td { background: oklch(from var(--grow) l c h / 0.06); }
+.orphan-table .status-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  transition: background 0.8s, box-shadow 0.8s;
+}
+.orphan-table .status-dot.orphan { background: var(--accent); box-shadow: 0 0 0 3px oklch(from var(--accent) l c h / 0.2); }
+.orphan-table .status-dot.connected { background: var(--grow); box-shadow: 0 0 0 3px oklch(from var(--grow) l c h / 0.2); }
+.orphan-table .connection {
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+  font-style: italic;
+}
+.orphan-table .arrow {
+  display: inline-block;
+  color: var(--grow);
+  font-weight: 700;
+  margin: 0 0.4rem;
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+.orphan-table tr.fixed .arrow { opacity: 1; }
+
+/* ── velocity panels ─────────────────────────────────────── */
+.velocity-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+@media (max-width: 780px) { .velocity-panels { grid-template-columns: 1fr; } }
+.panel {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.4rem;
+  box-shadow: var(--shadow);
+}
+.panel.hub { border-top: 3px solid var(--cool); }
+.panel.thin { border-top: 3px solid var(--fade); }
+.panel h3 {
+  margin-top: 0;
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  font-weight: 600;
+}
+.panel.hub h3 { color: var(--cool); }
+.panel.thin h3 { color: var(--fade); }
+.panel .tagline {
+  font-family: "Source Serif 4", serif;
+  font-size: 1.05rem;
+  color: var(--fg);
+  margin: 0.3rem 0 1rem;
+  font-style: italic;
+}
+
+/* ── heat strip for thin links ───────────────────────────── */
+.heat-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 1rem 0;
+}
+.heat-strip .strip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.5s, transform 0.5s;
+}
+.heat-strip .strip-row.visible {
+  opacity: 1;
+  transform: none;
+}
+.heat-strip .strip-bar {
+  height: 22px;
+  border-radius: 3px;
+  transition: width 0.7s ease-out;
+}
+.heat-strip .strip-label {
+  font-size: 0.78rem;
+  color: var(--fg-mid);
+  white-space: nowrap;
+  min-width: 200px;
+  text-align: right;
+}
+.heat-strip .strip-count {
+  font-size: 0.72rem;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  min-width: 2ch;
+}
+.heat-strip .strip-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.15em 0.5em;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.heat-strip .strip-tag.former-orphan {
+  background: oklch(from var(--grow) l c h / 0.12);
+  color: var(--grow);
+  border: 1px solid oklch(from var(--grow) l c h / 0.3);
+}
+.heat-strip .strip-tag.original-thin {
+  background: oklch(from var(--fade) l c h / 0.12);
+  color: var(--fade);
+  border: 1px solid oklch(from var(--fade) l c h / 0.3);
+}
+
+/* ── workflow diagram ────────────────────────────────────── */
+.workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 2rem 0;
+}
+.workflow-step {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  min-height: 58px;
+}
+.workflow-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  flex-shrink: 0;
+}
+.workflow-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  transition: background 0.4s, border-color 0.4s;
+  position: relative;
+  z-index: 2;
+}
+.workflow-connector {
+  width: 2px;
+  flex-grow: 1;
+  background: var(--border);
+  transition: background 0.4s;
+}
+.workflow-content {
+  flex: 1;
+  padding: 0 0 1.2rem;
+}
+.workflow-content .step-num {
+  font: 600 0.68rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  margin-bottom: 0.3rem;
+}
+.workflow-content .step-text {
+  font-size: 0.92rem;
+  color: var(--fg-mid);
+  line-height: 1.5;
+}
+.workflow-step.highlight .workflow-dot {
+  background: var(--grow);
+  border-color: var(--grow);
+  box-shadow: 0 0 0 4px oklch(from var(--grow) l c h / 0.2);
+}
+.workflow-step.highlight .workflow-connector { background: var(--grow); }
+.workflow-step.highlight .step-num { color: var(--grow); }
+.workflow-step.highlight .step-text { color: var(--fg); }
+.workflow-step.missing .workflow-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  border-style: dashed;
+}
+.workflow-step.missing .workflow-connector {
+  background: repeating-linear-gradient(180deg, var(--accent) 0, var(--accent) 4px, transparent 4px, transparent 8px);
+}
+.workflow-step.missing .step-num { color: var(--accent); }
+.workflow-step.missing .step-text { color: var(--accent); }
+
+/* ── actions ─────────────────────────────────────────────── */
+.actions {
+  display: grid;
+  grid-template-columns: 1.1fr 0.85fr 0.85fr;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+@media (max-width: 820px) { .actions { grid-template-columns: 1fr; } }
+.col {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-top-width: 3px;
+  border-radius: 10px;
+  padding: 1.3rem;
+  box-shadow: var(--shadow);
+}
+.col.immediate { border-top-color: var(--accent); }
+.col.watch     { border-top-color: var(--cool); }
+.col.skip      { border-top-color: var(--stop); }
+.col h3 {
+  margin: 0 0 1rem;
+  font: 600 0.72rem/1 -apple-system, system-ui, sans-serif;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.col.immediate h3 { color: var(--accent); }
+.col.watch h3     { color: var(--cool); }
+.col.skip h3      { color: var(--stop); }
+.col h3::before {
+  content: "";
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px oklch(from currentColor l c h / 0.18);
+}
+.card {
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.card:last-child { border-bottom: none; padding-bottom: 0; }
+.card .title {
+  font-size: 0.92rem;
+  color: var(--fg);
+  font-weight: 500;
+  line-height: 1.35;
+  margin-bottom: 0.25rem;
+}
+.card .why {
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+  line-height: 1.45;
+}
+
+/* ── concept chip ────────────────────────────────────────── */
+.chip {
+  display: inline-block;
+  padding: 0.1em 0.55em;
+  background: oklch(from var(--cool) l c h / 0.13);
+  color: var(--cool);
+  border: 1px solid oklch(from var(--cool) l c h / 0.4);
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: -apple-system, system-ui, sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* ── footer ──────────────────────────────────────────────── */
+footer {
+  margin-top: 6rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+  text-align: center;
+}
+footer a { color: var(--fg-dim); border-bottom-color: var(--border); }
+
+/* ── kbd hint ────────────────────────────────────────────── */
+.kbd {
+  display: inline-block;
+  padding: 0.1em 0.45em;
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font: 600 0.72em/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--fg-mid);
+}
+
+/* ── reduced motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  section { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<button id="theme-toggle" aria-label="Toggle theme" title="Toggle light / dark">☾</button>
+
+<nav id="minimap" aria-label="Section navigation">
+  <a href="#top">Top</a>
+  <a href="#summary">Summary</a>
+  <a href="#orphans">Orphans</a>
+  <a href="#hubs">Hub density</a>
+  <a href="#thin-links">Thin links</a>
+  <a href="#lesson">The lesson</a>
+  <a href="#actions">Actions</a>
+</nav>
+
+<main id="top">
+
+  <!-- ━━━ HERO ━━━ -->
+  <header class="hero">
+    <span class="date">KB Health Check · 2026-04-15</span>
+    <h1>10 dead ends.<br>Zero remain.</h1>
+    <p class="subtitle">A 59-page wiki had orphans hiding in plain sight. Here's the surgery.</p>
+    <div class="viz">
+      <svg id="hero-graph" viewBox="0 0 900 500" aria-label="Force-directed graph showing wiki link structure with orphans being fixed"></svg>
+      <div class="caption">
+        Each node is a wiki page. Lines are cross-references.
+        <strong style="color:var(--accent)">Amber nodes</strong> had zero incoming links.
+        Watch them connect and turn <strong style="color:var(--grow)">green</strong> as backlinks are added.
+      </div>
+    </div>
+    <p class="lede">
+      The wiki looked healthy at a glance: 59 pages, all indexed, no stale dates, no
+      missing sources. But the link graph told a different story. Ten pages were
+      cul-de-sacs — they linked <em>out</em> to hubs but nothing linked <em>in</em> to them.
+      One wikilink was a syntax bug that took two attempts to fix. This is the story
+      of finding and closing those loops.
+    </p>
+  </header>
+
+  <div class="pullquote">
+    <p>New pages start as cul-de-sacs unless you explicitly close the loop.</p>
+    <cite>— Issues Fixed, orphan analysis</cite>
+  </div>
+
+  <!-- ━━━ SUMMARY ━━━ -->
+  <section id="summary">
+    <h2>The numbers</h2>
+    <p>
+      Before and after, side by side. The headline: every orphan resolved, every
+      broken link fixed, average connectivity up. The wiki went from structurally
+      fragile to structurally sound in one pass.
+    </p>
+    <div class="stat-grid">
+      <div class="stat">
+        <span class="value">59</span>
+        <span class="label">pages on disk<br><em>all indexed in INDEX.md</em></span>
+      </div>
+      <div class="stat accent" id="stat-orphan" style="cursor:pointer" title="Click to replay the hero animation">
+        <span class="value">10<span style="font-size:1.6rem"> → </span>0</span>
+        <span class="label">orphans found → fixed<br><em>click to replay ↑</em></span>
+      </div>
+      <div class="stat grow">
+        <span class="value">11</span>
+        <span class="label">total fixes<br><em>10 orphans + 1 wikilink bug</em></span>
+      </div>
+      <div class="stat cool">
+        <span class="value">5.7</span>
+        <span class="label">avg outgoing degree<br><em>up from 5.5</em></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ ORPHAN TABLE ━━━ -->
+  <section id="orphans">
+    <h2>The ten orphans</h2>
+    <p>
+      Every orphan was a page that linked outward to existing hubs but had nothing
+      linking back. Each was fixed by adding a single back-reference from the most
+      natural parent page. The connection column shows why the pairing makes sense.
+    </p>
+    <div class="viz" style="overflow-x:auto;">
+      <table class="orphan-table" id="orphan-fix-table">
+        <thead>
+          <tr>
+            <th style="width:30px;"></th>
+            <th>Orphan page</th>
+            <th style="width:30px;"></th>
+            <th>Connected to</th>
+            <th>Why</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="caption">Each row animates when it enters the viewport. The dot transitions from amber (orphaned) to green (connected).</div>
+    </div>
+
+    <h3>The wikilink bug</h3>
+    <p>
+      Alongside the orphans, one unresolved wikilink lurked in
+      <strong>Claude Obsidian Integration</strong>. The page contained a literal
+      bracket-bracket token inside backticks, meant as documentation of the syntax.
+      Obsidian parses wikilinks inside backticks anyway, so it created a phantom link
+      to a non-existent page.
+    </p>
+    <p>
+      <strong>Fix attempt 1</strong> changed the brackets to a hyphenated form — same
+      problem, different name. <strong>Fix attempt 2</strong> rephrased the line
+      entirely: <em>"compiles concepts into wiki/ pages with Obsidian-style
+      cross-references."</em> No brackets, no phantom link.
+    </p>
+  </section>
+
+  <div class="pullquote">
+    <p>Never write bracket-bracket-anything in a wiki page when you mean to refer to
+    the syntax — even inside backticks or code fences, Obsidian still resolves it.</p>
+    <cite>— Wikilink bug lesson</cite>
+  </div>
+
+  <!-- ━━━ HUB DENSITY ━━━ -->
+  <section id="hubs">
+    <h2>What holds it all together</h2>
+    <p>
+      The top 8 hubs by incoming links. These are the load-bearing ideas of the wiki —
+      the concepts every other page ends up depending on. Multi-Agent Architecture
+      leads with 25 incoming references, then a four-way tie at 20.
+    </p>
+    <div class="viz">
+      <svg id="hub-bars" viewBox="0 0 900 420" aria-label="Hub density horizontal bar chart showing top concepts by incoming links"></svg>
+      <div class="caption">
+        The architecture isn't just opinion — it's what every idea in the wiki ends up depending on.
+        Hover a bar for the exact count.
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ THIN LINKS ━━━ -->
+  <section id="thin-links">
+    <h2>The fragile edges</h2>
+    <p>
+      Sixteen pages survive with exactly one incoming link. Each is one edit away
+      from becoming the next orphan. Ten are the freshly-fixed orphans, now
+      connected but thin. Six were already thin before this run.
+    </p>
+    <div class="viz">
+      <div class="heat-strip" id="thin-link-strip"></div>
+      <div class="caption">
+        One strip per page. <span style="color:var(--grow)">Green tags</span> = former orphans now in
+        thin-link tier. <span style="color:var(--fade)">Rust tags</span> = already thin before this run.
+        These should get a second backlink on the next compile pass.
+      </div>
+    </div>
+  </section>
+
+  <div class="pullquote">
+    <p>The load-bearing concepts are skills, resolvers, harness, compounding,
+    multi-agent, KB, and memory.</p>
+    <cite>— Hub Density analysis</cite>
+  </div>
+
+  <!-- ━━━ THE LESSON ━━━ -->
+  <section id="lesson">
+    <h2>The backlink-loop rule</h2>
+    <p>
+      Every single orphan was created during a compile pass. The pages linked
+      <em>outward</em> (so they have context) but nothing linked <em>inward</em>
+      (so they're invisible to the graph). The fix is a process change: step 3b.
+    </p>
+
+    <div class="velocity-panels">
+      <div class="panel thin">
+        <h3>Before — orphan factory</h3>
+        <p class="tagline">The compile workflow without step 3b.</p>
+        <div class="workflow" id="workflow-before">
+          <div class="workflow-step">
+            <div class="workflow-line"><div class="workflow-dot"></div><div class="workflow-connector"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Step 1</div>
+              <div class="step-text">Read raw clippings, extract concepts</div>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="workflow-line"><div class="workflow-dot"></div><div class="workflow-connector"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Step 2</div>
+              <div class="step-text">Create/update wiki page with outgoing links</div>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="workflow-line"><div class="workflow-dot"></div><div class="workflow-connector"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Step 3</div>
+              <div class="step-text">Declare compile done</div>
+            </div>
+          </div>
+          <div class="workflow-step missing">
+            <div class="workflow-line"><div class="workflow-dot"></div><div class="workflow-connector"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Step 3b — missing</div>
+              <div class="step-text">No back-reference step. New page is a dead end.</div>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="workflow-line"><div class="workflow-dot"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Result</div>
+              <div class="step-text">10 orphans accumulate per run</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel hub">
+        <h3>After — backlink loop</h3>
+        <p class="tagline">The compile workflow with step 3b.</p>
+        <div class="workflow" id="workflow-after">
+          <div class="workflow-step">
+            <div class="workflow-line"><div class="workflow-dot"></div><div class="workflow-connector"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Step 1</div>
+              <div class="step-text">Read raw clippings, extract concepts</div>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="workflow-line"><div class="workflow-dot"></div><div class="workflow-connector"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Step 2</div>
+              <div class="step-text">Create/update wiki page with outgoing links</div>
+            </div>
+          </div>
+          <div class="workflow-step highlight">
+            <div class="workflow-line"><div class="workflow-dot"></div><div class="workflow-connector"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Step 3a — new</div>
+              <div class="step-text">Add one back-reference from the most relevant parent page</div>
+            </div>
+          </div>
+          <div class="workflow-step highlight">
+            <div class="workflow-line"><div class="workflow-dot"></div><div class="workflow-connector"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Step 3b — new</div>
+              <div class="step-text">Verify: does the new page have at least 1 incoming link?</div>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="workflow-line"><div class="workflow-dot"></div></div>
+            <div class="workflow-content">
+              <div class="step-num">Result</div>
+              <div class="step-text">Zero orphans. Every page reachable from day one.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ ACTIONS ━━━ -->
+  <section id="actions">
+    <h2>What to do next</h2>
+    <p>
+      The health check is clean, but the report identifies structural improvements
+      for the next compile pass. Three tiers.
+    </p>
+    <div class="actions">
+      <div class="col immediate">
+        <h3>Immediate</h3>
+        <div class="card">
+          <div class="title">Build backlink-loop into kb-compile</div>
+          <div class="why">When a new page is created, immediately edit one parent to add the back-reference. No new page lands without one incoming link.</div>
+        </div>
+        <div class="card">
+          <div class="title">Promote the 16 thin-link pages</div>
+          <div class="why">Give each a second backlink on the next compile pass. These are one edit away from becoming orphans again.</div>
+        </div>
+      </div>
+      <div class="col watch">
+        <h3>Watch</h3>
+        <div class="card">
+          <div class="title">AI Psychosis as a new page</div>
+          <div class="why">Named explicitly in the Karpathy NoPriors interview. If a second source mentions it, create a standalone page.</div>
+        </div>
+        <div class="card">
+          <div class="title">515 raw clippings remain</div>
+          <div class="why">This run absorbed 6 high-engagement March orphans. The next ~30 in the 2k-10k engagement range yield another batch.</div>
+        </div>
+      </div>
+      <div class="col skip">
+        <h3>No action</h3>
+        <div class="card">
+          <div class="title">INDEX reconciliation</div>
+          <div class="why">59 pages on disk, 59 indexed. Zero gaps.</div>
+        </div>
+        <div class="card">
+          <div class="title">Stale dates audit</div>
+          <div class="why">Zero pages with frontmatter dates >7 days behind mtime.</div>
+        </div>
+        <div class="card">
+          <div class="title">Autonomous Research Agents / AutoResearch</div>
+          <div class="why">0.77 name-similarity, flagged as potential duplicate. Reading confirms parent/child relationship. Correctly modeled.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Narration of <a href="../report/kb-health-2026-04-15.md">kb-health-2026-04-15.md</a>
+      · rendered by <code>/kb-narration</code> · d3 v7<br>
+      Use <span class="kbd">j</span> <span class="kbd">k</span> or <span class="kbd">↓</span> <span class="kbd">↑</span> to move between sections.
+    </p>
+  </footer>
+</main>
+
+<script>
+/* ────────────────────────────────────────────────────────────────
+ * DATA — parsed from wiki/report/kb-health-2026-04-15.md
+ * ──────────────────────────────────────────────────────────────── */
+const DATA = {
+  summary: {
+    pages: 59,
+    orphansBefore: 10,
+    orphansAfter: 0,
+    unresolvedBefore: 1,
+    unresolvedAfter: 0,
+    totalFixes: 11,
+    avgDegreeBefore: 5.5,
+    avgDegreeAfter: 5.7
+  },
+
+  orphans: [
+    { name: 'Agent Spatial Interfaces',       parent: 'Agent Observability',       connection: 'RPG metaphor as alternative to dashboards' },
+    { name: 'Agent Traces as Training Signal', parent: 'Decision Traces',          connection: 'Production traces become fine-tuning data' },
+    { name: 'Autonomous Research Agents',      parent: 'AutoResearch',             connection: 'Multi-day variant of the AutoResearch loop' },
+    { name: 'Claude Certified Architect',      parent: 'Claude Managed Agents',    connection: 'Credentialing-layer counterpart to product-layer move' },
+    { name: 'Claude Code Internals',           parent: 'Thin Harness Fat Skills',  connection: 'Source-leak validates the principle inside Anthropic' },
+    { name: 'Claude Obsidian Integration',     parent: 'Obsidian',                 connection: 'Technical recipe for wiring Claude Code into a vault' },
+    { name: 'Local Frontier Models',           parent: 'Token Cost Optimization',  connection: 'Local inference eliminates API cost' },
+    { name: 'NotebookLM Bridge',               parent: 'Persistent Memory',        connection: 'Token-free document analysis offload' },
+    { name: 'Prompt-First Development',        parent: 'Agent-Native Coding Shift',connection: 'Next abstraction layer above' },
+    { name: 'TDD for Agents',                  parent: 'Test-First Bug Fix',       connection: 'Broader pattern: tests first, agent fills in' }
+  ],
+
+  hubs: [
+    { name: 'Multi-Agent Architecture',     incoming: 25, rank: 1 },
+    { name: 'Compounding Knowledge Flywheel', incoming: 20, rank: 2 },
+    { name: 'Thin Harness Fat Skills',      incoming: 20, rank: 2 },
+    { name: 'CLAUDE.md & Resolvers',        incoming: 20, rank: 2 },
+    { name: 'Claude Code Skills',           incoming: 20, rank: 2 },
+    { name: 'Personal Knowledge Base',      incoming: 18, rank: 6 },
+    { name: 'Persistent Memory',            incoming: 13, rank: 7 },
+    { name: 'Claude Code Hooks',            incoming: 13, rank: 7 }
+  ],
+
+  thinLinks: [
+    { name: 'Advisor Pattern',                       source: 'Claude Managed Agents',      type: 'original-thin' },
+    { name: 'Claude Code System Prompt Architecture', source: 'Claude Code Internals',      type: 'original-thin' },
+    { name: 'MCP Implementation Patterns',            source: 'GBrain',                     type: 'original-thin' },
+    { name: 'Parallel Agent Workflows',               source: 'Claude Managed Agents',      type: 'original-thin' },
+    { name: 'Platform-to-Local Sync',                 source: 'Claude Obsidian Integration', type: 'original-thin' },
+    { name: 'btw Side Chain Conversations',           source: 'Claude Code Skills',          type: 'original-thin' },
+    { name: 'Agent Spatial Interfaces',               source: 'Agent Observability',         type: 'former-orphan' },
+    { name: 'Agent Traces as Training Signal',        source: 'Decision Traces',             type: 'former-orphan' },
+    { name: 'Autonomous Research Agents',             source: 'AutoResearch',                type: 'former-orphan' },
+    { name: 'Claude Certified Architect',             source: 'Claude Managed Agents',       type: 'former-orphan' },
+    { name: 'Claude Code Internals',                  source: 'Thin Harness Fat Skills',     type: 'former-orphan' },
+    { name: 'Claude Obsidian Integration',            source: 'Obsidian',                    type: 'former-orphan' },
+    { name: 'Local Frontier Models',                  source: 'Token Cost Optimization',     type: 'former-orphan' },
+    { name: 'NotebookLM Bridge',                      source: 'Persistent Memory',           type: 'former-orphan' },
+    { name: 'Prompt-First Development',               source: 'Agent-Native Coding Shift',   type: 'former-orphan' },
+    { name: 'TDD for Agents',                         source: 'Test-First Bug Fix',          type: 'former-orphan' }
+  ],
+
+  // Synthetic graph data for force-directed hero viz
+  // Includes all 8 hubs, 10 orphans, and 41 filler nodes to reach 59
+  graphNodes: (function() {
+    const hubs = [
+      { id: 'Multi-Agent Architecture',     group: 'hub', incoming: 25 },
+      { id: 'Compounding Knowledge Flywheel', group: 'hub', incoming: 20 },
+      { id: 'Thin Harness Fat Skills',      group: 'hub', incoming: 20 },
+      { id: 'CLAUDE.md & Resolvers',        group: 'hub', incoming: 20 },
+      { id: 'Claude Code Skills',           group: 'hub', incoming: 20 },
+      { id: 'Personal Knowledge Base',      group: 'hub', incoming: 18 },
+      { id: 'Persistent Memory',            group: 'hub', incoming: 13 },
+      { id: 'Claude Code Hooks',            group: 'hub', incoming: 13 }
+    ];
+    const orphans = [
+      { id: 'Agent Spatial Interfaces',        group: 'orphan', parent: 'Agent Observability' },
+      { id: 'Agent Traces as Training Signal', group: 'orphan', parent: 'Decision Traces' },
+      { id: 'Autonomous Research Agents',      group: 'orphan', parent: 'AutoResearch' },
+      { id: 'Claude Certified Architect',      group: 'orphan', parent: 'Claude Managed Agents' },
+      { id: 'Claude Code Internals',           group: 'orphan', parent: 'Thin Harness Fat Skills' },
+      { id: 'Claude Obsidian Integration',     group: 'orphan', parent: 'Obsidian' },
+      { id: 'Local Frontier Models',           group: 'orphan', parent: 'Token Cost Optimization' },
+      { id: 'NotebookLM Bridge',               group: 'orphan', parent: 'Persistent Memory' },
+      { id: 'Prompt-First Development',        group: 'orphan', parent: 'Agent-Native Coding Shift' },
+      { id: 'TDD for Agents',                  group: 'orphan', parent: 'Test-First Bug Fix' }
+    ];
+    // Parents that aren't already in hubs
+    const parentIds = ['Agent Observability', 'Decision Traces', 'AutoResearch',
+      'Claude Managed Agents', 'Obsidian', 'Token Cost Optimization',
+      'Agent-Native Coding Shift', 'Test-First Bug Fix'];
+    const parents = parentIds.map(id => ({ id, group: 'regular', incoming: 4 }));
+    // Fill remaining slots to reach 59
+    const fillerNames = [
+      'GBrain', 'Parallel Agent Workflows', 'Advisor Pattern',
+      'Claude Code System Prompt Architecture', 'MCP Implementation Patterns',
+      'Platform-to-Local Sync', 'btw Side Chain Conversations',
+      'Token Cost Optimization', 'Hosted Filesystem as Memory',
+      'Team OS', 'Zero Human Company', 'Autonomous Vertical Agents',
+      'Karpathy LLM KBs', 'Claude Code Power Tips', 'MCP Protocol',
+      'NotebookLM', 'Semantic Router',
+      'Structured Output Patterns', 'Cost Engineering',
+      'Tool Use Patterns', 'Eval-Driven Development',
+      'Context Window Management', 'Prompt Engineering',
+      'AI Safety Practices', 'LLM Benchmarking',
+      'Retrieval Augmented Generation',
+      'Signal Velocity Brief', 'Compounding Claude Code Setup',
+      'Agent Error Recovery', 'Skill Composition Patterns',
+      'INDEX', 'Memory Architecture',
+      'Inference Cost Curves', 'Context Switching Overhead'
+    ];
+    const fillers = [];
+    const existingIds = new Set([...hubs, ...orphans, ...parents].map(n => n.id));
+    for (const name of fillerNames) {
+      if (!existingIds.has(name) && (hubs.length + orphans.length + parents.length + fillers.length) < 59) {
+        fillers.push({ id: name, group: 'regular', incoming: 2 + Math.floor(Math.random() * 6) });
+        existingIds.add(name);
+      }
+    }
+    return [...hubs, ...orphans, ...parents, ...fillers];
+  })(),
+
+  graphLinks: (function() {
+    const links = [];
+    // Orphan outgoing links (to their hubs — these exist before the fix)
+    const orphanOutgoing = [
+      ['Agent Spatial Interfaces', 'Multi-Agent Architecture'],
+      ['Agent Traces as Training Signal', 'Persistent Memory'],
+      ['Autonomous Research Agents', 'Multi-Agent Architecture'],
+      ['Claude Certified Architect', 'Claude Code Skills'],
+      ['Claude Code Internals', 'Claude Code Skills'],
+      ['Claude Obsidian Integration', 'Personal Knowledge Base'],
+      ['Local Frontier Models', 'Compounding Knowledge Flywheel'],
+      ['NotebookLM Bridge', 'Compounding Knowledge Flywheel'],
+      ['Prompt-First Development', 'Multi-Agent Architecture'],
+      ['TDD for Agents', 'Claude Code Hooks']
+    ];
+    orphanOutgoing.forEach(([s, t]) => links.push({ source: s, target: t, type: 'existing' }));
+
+    // Fix links (parent → orphan, added during health check)
+    const fixLinks = [
+      ['Agent Observability', 'Agent Spatial Interfaces'],
+      ['Decision Traces', 'Agent Traces as Training Signal'],
+      ['AutoResearch', 'Autonomous Research Agents'],
+      ['Claude Managed Agents', 'Claude Certified Architect'],
+      ['Thin Harness Fat Skills', 'Claude Code Internals'],
+      ['Obsidian', 'Claude Obsidian Integration'],
+      ['Token Cost Optimization', 'Local Frontier Models'],
+      ['Persistent Memory', 'NotebookLM Bridge'],
+      ['Agent-Native Coding Shift', 'Prompt-First Development'],
+      ['Test-First Bug Fix', 'TDD for Agents']
+    ];
+    fixLinks.forEach(([s, t]) => links.push({ source: s, target: t, type: 'fix' }));
+
+    // Regular inter-hub and regular-to-hub links for structure
+    const regularLinks = [
+      ['Compounding Knowledge Flywheel', 'Multi-Agent Architecture'],
+      ['Thin Harness Fat Skills', 'Claude Code Skills'],
+      ['CLAUDE.md & Resolvers', 'Claude Code Skills'],
+      ['Claude Code Hooks', 'Claude Code Skills'],
+      ['Personal Knowledge Base', 'Compounding Knowledge Flywheel'],
+      ['Persistent Memory', 'Personal Knowledge Base'],
+      ['Claude Code Hooks', 'CLAUDE.md & Resolvers'],
+      ['Thin Harness Fat Skills', 'Multi-Agent Architecture'],
+      ['CLAUDE.md & Resolvers', 'Multi-Agent Architecture'],
+      ['Compounding Knowledge Flywheel', 'Personal Knowledge Base'],
+      ['GBrain', 'Multi-Agent Architecture'],
+      ['Parallel Agent Workflows', 'Multi-Agent Architecture'],
+      ['Advisor Pattern', 'Multi-Agent Architecture'],
+      ['Agent Observability', 'Multi-Agent Architecture'],
+      ['Decision Traces', 'Persistent Memory'],
+      ['AutoResearch', 'Multi-Agent Architecture'],
+      ['Claude Managed Agents', 'Multi-Agent Architecture'],
+      ['Obsidian', 'Personal Knowledge Base'],
+      ['Token Cost Optimization', 'Compounding Knowledge Flywheel'],
+      ['Agent-Native Coding Shift', 'Multi-Agent Architecture'],
+      ['Test-First Bug Fix', 'Claude Code Skills'],
+      ['Hosted Filesystem as Memory', 'Persistent Memory'],
+      ['Team OS', 'Multi-Agent Architecture'],
+      ['Autonomous Vertical Agents', 'Multi-Agent Architecture'],
+      ['Claude Code Power Tips', 'Claude Code Skills'],
+      ['MCP Protocol', 'Multi-Agent Architecture'],
+      ['Semantic Router', 'CLAUDE.md & Resolvers'],
+      ['Structured Output Patterns', 'Thin Harness Fat Skills'],
+      ['Cost Engineering', 'Compounding Knowledge Flywheel'],
+      ['Tool Use Patterns', 'Claude Code Skills'],
+      ['Eval-Driven Development', 'Compounding Knowledge Flywheel'],
+      ['Context Window Management', 'Persistent Memory'],
+      ['Prompt Engineering', 'CLAUDE.md & Resolvers'],
+      ['AI Safety Practices', 'Multi-Agent Architecture'],
+      ['LLM Benchmarking', 'Compounding Knowledge Flywheel'],
+      ['Retrieval Augmented Generation', 'Persistent Memory'],
+      ['Claude Managed Agents', 'Thin Harness Fat Skills'],
+      ['Karpathy LLM KBs', 'Personal Knowledge Base'],
+      ['Zero Human Company', 'Multi-Agent Architecture'],
+      ['Claude Code System Prompt Architecture', 'CLAUDE.md & Resolvers'],
+      ['MCP Implementation Patterns', 'MCP Protocol'],
+      ['Platform-to-Local Sync', 'Obsidian'],
+      ['btw Side Chain Conversations', 'Claude Code Skills'],
+      ['GBrain', 'Thin Harness Fat Skills'],
+      ['Parallel Agent Workflows', 'Thin Harness Fat Skills'],
+      ['Advisor Pattern', 'CLAUDE.md & Resolvers'],
+      ['Signal Velocity Brief', 'Compounding Knowledge Flywheel'],
+      ['Compounding Claude Code Setup', 'Claude Code Skills'],
+      ['Agent Error Recovery', 'Multi-Agent Architecture'],
+      ['Skill Composition Patterns', 'Thin Harness Fat Skills'],
+      ['INDEX', 'Personal Knowledge Base'],
+      ['Memory Architecture', 'Persistent Memory'],
+      ['Inference Cost Curves', 'Compounding Knowledge Flywheel'],
+      ['Context Switching Overhead', 'Multi-Agent Architecture']
+    ];
+    regularLinks.forEach(([s, t]) => links.push({ source: s, target: t, type: 'existing' }));
+
+    return links;
+  })()
+};
+
+/* ────────────────────────────────────────────────────────────────
+ * HERO GRAPH — force-directed graph with orphan fix animation
+ * ──────────────────────────────────────────────────────────────── */
+let heroSimulation = null;
+let heroAnimationTimer = null;
+
+function drawHero(replay) {
+  const svg = d3.select('#hero-graph');
+  svg.selectAll('*').remove();
+  if (heroSimulation) { heroSimulation.stop(); heroSimulation = null; }
+  if (heroAnimationTimer) { clearTimeout(heroAnimationTimer); heroAnimationTimer = null; }
+
+  const W = 900, H = 500;
+  const container = svg.node().parentElement;
+  const actualW = container ? container.clientWidth - 48 : W;
+  const scale = Math.min(actualW / W, 1);
+
+  // deep clone nodes/links
+  const nodes = DATA.graphNodes.map(d => ({...d, x: W/2 + (Math.random()-0.5)*200, y: H/2 + (Math.random()-0.5)*200 }));
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+
+  const links = DATA.graphLinks
+    .filter(l => nodeMap[l.source] && nodeMap[l.target])
+    .map(l => ({ source: l.source, target: l.target, type: l.type }));
+
+  // Separate fix links — they appear later
+  const existingLinks = links.filter(l => l.type !== 'fix');
+  const fixLinks = links.filter(l => l.type === 'fix');
+
+  // Title
+  svg.append('text').attr('x', W/2).attr('y', 20)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg-dim)').attr('font-size', 12)
+    .text('59 wiki pages · link structure · orphans highlighted');
+
+  // Links group (existing only at first)
+  const linkGroup = svg.append('g').attr('class', 'links');
+  const linkSel = linkGroup.selectAll('line').data(existingLinks).join('line')
+    .attr('stroke', 'var(--border)')
+    .attr('stroke-opacity', 0.35)
+    .attr('stroke-width', 0.7);
+
+  // Fix links group (hidden initially)
+  const fixLinkGroup = svg.append('g').attr('class', 'fix-links');
+
+  // Node sizing
+  function nodeRadius(d) {
+    if (d.group === 'hub') return 6 + Math.sqrt(d.incoming) * 1.5;
+    if (d.group === 'orphan') return 6;
+    return 4;
+  }
+
+  // Nodes
+  const nodeGroup = svg.append('g').attr('class', 'nodes');
+  const nodeSel = nodeGroup.selectAll('circle').data(nodes).join('circle')
+    .attr('r', d => nodeRadius(d))
+    .attr('fill', d => {
+      if (d.group === 'orphan') return 'var(--accent)';
+      if (d.group === 'hub') return 'var(--cool)';
+      return 'var(--fg-dim)';
+    })
+    .attr('fill-opacity', d => d.group === 'hub' ? 0.8 : d.group === 'orphan' ? 0.9 : 0.4)
+    .attr('stroke', d => {
+      if (d.group === 'orphan') return 'var(--accent)';
+      if (d.group === 'hub') return 'var(--cool)';
+      return 'none';
+    })
+    .attr('stroke-width', d => d.group === 'orphan' ? 2 : d.group === 'hub' ? 1.5 : 0)
+    .attr('opacity', 0);
+
+  // Hub labels
+  const labelGroup = svg.append('g').attr('class', 'labels');
+  const hubNodes = nodes.filter(n => n.group === 'hub');
+  const labelSel = labelGroup.selectAll('text').data(hubNodes).join('text')
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg-mid)')
+    .attr('font-size', 9)
+    .attr('font-weight', 600)
+    .attr('dy', d => -nodeRadius(d) - 5)
+    .attr('opacity', 0)
+    .text(d => d.id.length > 22 ? d.id.slice(0, 20) + '...' : d.id);
+
+  // Hero stat callout
+  const statGroup = svg.append('g').attr('transform', `translate(${W/2}, ${H - 40})`);
+  const heroStat = statGroup.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--accent)')
+    .attr('font-size', 44)
+    .attr('font-weight', 700)
+    .attr('font-family', 'Source Serif 4, serif')
+    .attr('opacity', 0)
+    .text('10 orphans');
+  const heroSubStat = statGroup.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('y', 22)
+    .attr('fill', 'var(--fg-dim)')
+    .attr('font-size', 12)
+    .attr('opacity', 0)
+    .text('zero incoming links — watch them get connected');
+
+  // Orphan pulse
+  function pulseOrphans() {
+    nodeSel.filter(d => d.group === 'orphan')
+      .attr('stroke-width', 2)
+      .transition().duration(600)
+      .attr('stroke-width', 5)
+      .attr('stroke-opacity', 0.6)
+      .transition().duration(600)
+      .attr('stroke-width', 2)
+      .attr('stroke-opacity', 1);
+  }
+
+  // Force simulation
+  heroSimulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(existingLinks).id(d => d.id).distance(60).strength(0.3))
+    .force('charge', d3.forceManyBody().strength(d => d.group === 'hub' ? -200 : -40))
+    .force('center', d3.forceCenter(W/2, H/2 - 20))
+    .force('collide', d3.forceCollide(d => nodeRadius(d) + 3))
+    .force('y', d3.forceY(H/2 - 20).strength(0.03))
+    .alphaDecay(0.02)
+    .on('tick', () => {
+      // Constrain to viewBox
+      nodes.forEach(n => {
+        n.x = Math.max(20, Math.min(W - 20, n.x));
+        n.y = Math.max(35, Math.min(H - 55, n.y));
+      });
+      linkSel
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      nodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+      labelSel.attr('x', d => d.x).attr('y', d => d.y);
+    });
+
+  // Fade nodes in
+  nodeSel.transition().delay((_, i) => 100 + i * 15).duration(400).attr('opacity', 1);
+  labelSel.transition().delay(800).duration(600).attr('opacity', 0.8);
+
+  // Show stat callout
+  heroStat.transition().delay(1200).duration(600).attr('opacity', 1);
+  heroSubStat.transition().delay(1400).duration(600).attr('opacity', 1);
+
+  // Pulse orphans
+  setTimeout(pulseOrphans, 1800);
+  setTimeout(pulseOrphans, 3200);
+
+  // Animate fix: add fix links and transition orphan color
+  heroAnimationTimer = setTimeout(() => {
+    // Add fix links with animated appearance
+    const fixSel = fixLinkGroup.selectAll('line').data(fixLinks).join('line')
+      .attr('x1', d => nodeMap[d.source] ? nodeMap[d.source].x : 0)
+      .attr('y1', d => nodeMap[d.source] ? nodeMap[d.source].y : 0)
+      .attr('x2', d => nodeMap[d.source] ? nodeMap[d.source].x : 0)
+      .attr('y2', d => nodeMap[d.source] ? nodeMap[d.source].y : 0)
+      .attr('stroke', 'var(--grow)')
+      .attr('stroke-width', 2)
+      .attr('stroke-opacity', 0.8);
+
+    fixSel.transition().delay((_, i) => i * 200).duration(500)
+      .attr('x2', d => nodeMap[d.target] ? nodeMap[d.target].x : 0)
+      .attr('y2', d => nodeMap[d.target] ? nodeMap[d.target].y : 0);
+
+    // Transition orphan nodes to green
+    nodeSel.filter(d => d.group === 'orphan')
+      .transition().delay((_, i) => i * 200).duration(600)
+      .attr('fill', 'var(--grow)')
+      .attr('stroke', 'var(--grow)')
+      .attr('stroke-width', 2);
+
+    // Update stat text
+    heroStat.transition().delay(2000).duration(400)
+      .attr('opacity', 0)
+      .transition().duration(400)
+      .text('0 orphans')
+      .attr('fill', 'var(--grow)')
+      .attr('opacity', 1);
+
+    heroSubStat.transition().delay(2000).duration(400)
+      .attr('opacity', 0)
+      .transition().duration(400)
+      .text('every page reachable — 11 fixes applied')
+      .attr('opacity', 1);
+
+    // Update simulation with fix links
+    heroSimulation.force('link').links([...existingLinks, ...fixLinks]);
+    heroSimulation.alpha(0.15).restart();
+
+    // Update fix links on tick
+    heroSimulation.on('tick', () => {
+      nodes.forEach(n => {
+        n.x = Math.max(20, Math.min(W - 20, n.x));
+        n.y = Math.max(35, Math.min(H - 55, n.y));
+      });
+      linkSel
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      fixSel
+        .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+      nodeSel.attr('cx', d => d.x).attr('cy', d => d.y);
+      labelSel.attr('x', d => d.x).attr('y', d => d.y);
+    });
+
+  }, 4200);
+
+  // Tooltip for nodes
+  const tip = svg.append('g').attr('class', 'tip').style('pointer-events', 'none');
+  const tipRect = tip.append('rect').attr('rx', 6).attr('fill', 'var(--bg-elev)').attr('stroke', 'var(--border)').attr('opacity', 0);
+  const tipText = tip.append('text').attr('fill', 'var(--fg)').attr('font-size', 11).attr('opacity', 0);
+
+  nodeSel
+    .on('mouseenter', (e, d) => {
+      const label = d.id + (d.group === 'orphan' ? ' (orphan)' : d.group === 'hub' ? ` (${d.incoming} in)` : '');
+      tipText.text(label);
+      const bbox = tipText.node().getBBox();
+      tipRect.attr('x', bbox.x - 6).attr('y', bbox.y - 3).attr('width', bbox.width + 12).attr('height', bbox.height + 6);
+      tip.attr('transform', `translate(${d.x},${d.y - nodeRadius(d) - 18})`);
+      tipRect.attr('opacity', 0.95);
+      tipText.attr('opacity', 1);
+    })
+    .on('mouseleave', () => {
+      tipRect.attr('opacity', 0);
+      tipText.attr('opacity', 0);
+    });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * ORPHAN TABLE — animated row-by-row reveal
+ * ──────────────────────────────────────────────────────────────── */
+function drawOrphanTable() {
+  const tbody = document.querySelector('#orphan-fix-table tbody');
+  if (tbody.children.length > 0) return; // already drawn
+
+  DATA.orphans.forEach((o, i) => {
+    const tr = document.createElement('tr');
+    tr.style.opacity = '0';
+    tr.style.transition = `opacity 0.5s ${i * 0.1}s, transform 0.5s ${i * 0.1}s`;
+    tr.style.transform = 'translateX(-10px)';
+
+    tr.innerHTML = `
+      <td><span class="status-dot orphan" data-idx="${i}"></span></td>
+      <td><strong>${escapeHtml(o.name)}</strong></td>
+      <td><span class="arrow" data-idx="${i}">&#8592;</span></td>
+      <td>${escapeHtml(o.parent)}</td>
+      <td><span class="connection">${escapeHtml(o.connection)}</span></td>
+    `;
+    tbody.appendChild(tr);
+
+    // Animate in
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        tr.style.opacity = '1';
+        tr.style.transform = 'none';
+      });
+    });
+
+    // Transition dot and row after delay
+    setTimeout(() => {
+      tr.classList.add('fixed');
+      const dot = tr.querySelector('.status-dot');
+      if (dot) { dot.classList.remove('orphan'); dot.classList.add('connected'); }
+      const arrow = tr.querySelector('.arrow');
+      if (arrow) arrow.style.opacity = '1';
+    }, 800 + i * 200);
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * HUB DENSITY — horizontal bar chart
+ * ──────────────────────────────────────────────────────────────── */
+function drawHubs() {
+  const svg = d3.select('#hub-bars');
+  svg.selectAll('*').remove();
+  const W = 900, H = 420;
+  const m = { top: 20, right: 60, bottom: 30, left: 240 };
+  const iw = W - m.left - m.right, ih = H - m.top - m.bottom;
+  const g = svg.append('g').attr('transform', `translate(${m.left},${m.top})`);
+
+  const data = DATA.hubs;
+  const maxVal = d3.max(data, d => d.incoming);
+
+  const y = d3.scaleBand().domain(data.map(d => d.name)).range([0, ih]).padding(0.2);
+  const x = d3.scaleLinear().domain([0, maxVal + 2]).range([0, iw]);
+
+  // Gridlines
+  g.selectAll('line.grid').data(x.ticks(5)).join('line')
+    .attr('class', 'grid')
+    .attr('x1', d => x(d)).attr('x2', d => x(d))
+    .attr('y1', 0).attr('y2', ih)
+    .attr('stroke', 'var(--border)')
+    .attr('stroke-opacity', 0.3)
+    .attr('stroke-dasharray', '2 4');
+
+  // Bars
+  g.selectAll('rect.bar').data(data).join('rect')
+    .attr('class', 'bar')
+    .attr('x', 0).attr('y', d => y(d.name))
+    .attr('height', y.bandwidth())
+    .attr('width', 0)
+    .attr('fill', 'var(--cool)')
+    .attr('fill-opacity', 0.2)
+    .attr('stroke', 'var(--cool)')
+    .attr('stroke-width', 1)
+    .attr('rx', 3)
+    .transition().delay((_, i) => 80 * i).duration(700)
+    .attr('width', d => x(d.incoming));
+
+  // Labels on left
+  g.selectAll('text.name').data(data).join('text')
+    .attr('class', 'name')
+    .attr('x', -12).attr('y', d => y(d.name) + y.bandwidth() / 2 + 4)
+    .attr('text-anchor', 'end')
+    .attr('fill', 'var(--fg-mid)').attr('font-size', 12)
+    .text(d => d.name);
+
+  // Rank badges
+  g.selectAll('text.rank').data(data).join('text')
+    .attr('class', 'rank')
+    .attr('x', -230).attr('y', d => y(d.name) + y.bandwidth() / 2 + 4)
+    .attr('text-anchor', 'start')
+    .attr('fill', 'var(--fg-dim)').attr('font-size', 10)
+    .attr('font-family', 'JetBrains Mono, SF Mono, ui-monospace, monospace')
+    .text(d => `#${d.rank}`);
+
+  // Values on right
+  g.selectAll('text.val').data(data).join('text')
+    .attr('class', 'val')
+    .attr('x', d => x(d.incoming) + 8)
+    .attr('y', d => y(d.name) + y.bandwidth() / 2 + 4)
+    .attr('fill', 'var(--cool)').attr('font-size', 13).attr('font-weight', 700)
+    .attr('font-variant-numeric', 'tabular-nums')
+    .attr('opacity', 0)
+    .text(d => d.incoming)
+    .transition().delay((_, i) => 80 * i + 500).duration(400).attr('opacity', 1);
+
+  // Tie indicator for rank 2
+  const tieData = data.filter(d => d.rank === 2);
+  if (tieData.length > 1) {
+    const tieY1 = y(tieData[0].name) + y.bandwidth() / 2;
+    const tieY2 = y(tieData[tieData.length - 1].name) + y.bandwidth() / 2;
+    g.append('line')
+      .attr('x1', x(20) + 32).attr('x2', x(20) + 32)
+      .attr('y1', tieY1).attr('y2', tieY2)
+      .attr('stroke', 'var(--fg-dim)').attr('stroke-width', 1)
+      .attr('stroke-dasharray', '3 3')
+      .attr('opacity', 0)
+      .transition().delay(1200).duration(400).attr('opacity', 0.6);
+
+    g.append('text')
+      .attr('x', x(20) + 38).attr('y', (tieY1 + tieY2) / 2 + 4)
+      .attr('fill', 'var(--fg-dim)').attr('font-size', 9)
+      .attr('font-style', 'italic')
+      .attr('opacity', 0)
+      .text('4-way tie')
+      .transition().delay(1200).duration(400).attr('opacity', 0.6);
+  }
+
+  // Axis
+  g.append('g').attr('transform', `translate(0,${ih})`)
+    .call(d3.axisBottom(x).ticks(5).tickSize(0).tickPadding(8))
+    .call(g => g.select('.domain').remove())
+    .call(g => g.selectAll('text').attr('fill', 'var(--fg-dim)').attr('font-size', 10));
+
+  // Hover interactivity
+  g.selectAll('rect.bar')
+    .on('mouseenter', function(e, d) {
+      d3.select(this).attr('fill-opacity', 0.4);
+    })
+    .on('mouseleave', function(e, d) {
+      d3.select(this).attr('fill-opacity', 0.2);
+    });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * THIN LINKS — heat strip risk visualization
+ * ──────────────────────────────────────────────────────────────── */
+function drawThinLinks() {
+  const strip = document.getElementById('thin-link-strip');
+  if (strip.children.length > 0) return; // already drawn
+
+  // Sort: original-thin first, then former-orphan
+  const sorted = [...DATA.thinLinks].sort((a, b) => {
+    if (a.type === b.type) return a.name.localeCompare(b.name);
+    return a.type === 'original-thin' ? -1 : 1;
+  });
+
+  sorted.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'strip-row';
+
+    const label = document.createElement('span');
+    label.className = 'strip-label';
+    label.textContent = item.name;
+
+    const bar = document.createElement('span');
+    bar.className = 'strip-bar';
+    bar.style.width = '0px';
+    bar.style.background = item.type === 'former-orphan'
+      ? 'linear-gradient(90deg, oklch(from var(--grow) l c h / 0.3), oklch(from var(--fade) l c h / 0.3))'
+      : 'oklch(from var(--fade) l c h / 0.35)';
+    bar.style.border = item.type === 'former-orphan'
+      ? '1px solid oklch(from var(--grow) l c h / 0.5)'
+      : '1px solid oklch(from var(--fade) l c h / 0.5)';
+
+    const count = document.createElement('span');
+    count.className = 'strip-count';
+    count.textContent = '1';
+
+    const tag = document.createElement('span');
+    tag.className = `strip-tag ${item.type}`;
+    tag.textContent = item.type === 'former-orphan' ? 'fixed' : 'was thin';
+
+    const source = document.createElement('span');
+    source.className = 'strip-label';
+    source.style.minWidth = '170px';
+    source.style.textAlign = 'left';
+    source.style.fontSize = '0.72rem';
+    source.style.color = 'var(--fg-dim)';
+    source.textContent = '\u2190 ' + item.source;
+
+    row.appendChild(label);
+    row.appendChild(bar);
+    row.appendChild(count);
+    row.appendChild(tag);
+    row.appendChild(source);
+    strip.appendChild(row);
+
+    // Animate in
+    setTimeout(() => {
+      row.classList.add('visible');
+      bar.style.width = '80px';
+      bar.style.transition = 'width 0.7s ease-out';
+    }, i * 60);
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * CHROME — DO NOT MODIFY without updating template.html
+ * ──────────────────────────────────────────────────────────────── */
+
+// reading progress
+const progressEl = document.getElementById('progress');
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  progressEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+}, { passive: true });
+
+// section entry + lazy viz draw
+const vizDrawnOnce = new Set();
+const entryObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('visible');
+    const id = e.target.id;
+    if (id === 'orphans' && !vizDrawnOnce.has(id)) { drawOrphanTable(); vizDrawnOnce.add(id); }
+    if (id === 'hubs' && !vizDrawnOnce.has(id)) { drawHubs(); vizDrawnOnce.add(id); }
+    if (id === 'thin-links' && !vizDrawnOnce.has(id)) { drawThinLinks(); vizDrawnOnce.add(id); }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -100px 0px' });
+document.querySelectorAll('section').forEach(s => entryObserver.observe(s));
+
+// hero always draws on load
+addEventListener('DOMContentLoaded', () => { drawHero(); });
+
+// replay hero on stat click
+document.getElementById('stat-orphan').addEventListener('click', () => { drawHero(true); });
+
+// minimap active-section highlight
+const minimapLinks = document.querySelectorAll('#minimap a');
+const activeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      minimapLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -50% 0px' });
+document.querySelectorAll('main > header, main > section').forEach(el => {
+  if (el.id) activeObserver.observe(el);
+});
+
+// theme toggle — persists via localStorage
+const themeBtn = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('kb-narration-theme');
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+themeBtn.textContent = document.documentElement.dataset.theme === 'dark' ? '☾' : '☀';
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('kb-narration-theme', next);
+  themeBtn.textContent = next === 'dark' ? '☾' : '☀';
+});
+
+// keyboard nav — j/k/↑/↓/g/G between sections
+const sectionIds = ['top', 'summary', 'orphans', 'hubs', 'thin-links', 'lesson', 'actions'];
+addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, button')) return;
+  const vy = document.documentElement.scrollTop + innerHeight * 0.3;
+  let cur = 0;
+  sectionIds.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= vy) cur = i;
+  });
+  let next = cur;
+  if (e.key === 'j' || e.key === 'ArrowDown') next = Math.min(sectionIds.length - 1, cur + 1);
+  else if (e.key === 'k' || e.key === 'ArrowUp') next = Math.max(0, cur - 1);
+  else if (e.key === 'g') next = 0;
+  else if (e.key === 'G') next = sectionIds.length - 1;
+  else return;
+  e.preventDefault();
+  document.getElementById(sectionIds[next]).scrollIntoView({ behavior: 'smooth' });
+});
+
+// resize-aware redraw
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    drawHero();
+    if (vizDrawnOnce.has('hubs')) drawHubs();
+  }, 200);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1194 @@
+<!doctype html>
+<!--
+  KB Narration: Harness Engineering
+  Source: report/harness-engineering.md
+  Spine: The productivity gap between 2x and 100x isn't the model — it's the harness architecture.
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Harness Engineering — KB Narration</title>
+<meta name="description" content="The architecture that separates 2x from 100x productivity with AI agents: thin harness, fat skills, hard enforcement.">
+<script src="https://unpkg.com/d3@7/dist/d3.min.js" defer></script>
+<style>
+:root {
+  --bg:        oklch(0.16 0.010 260);
+  --bg-elev:   oklch(0.21 0.012 260);
+  --bg-hi:     oklch(0.26 0.014 260);
+  --fg:        oklch(0.95 0.004 260);
+  --fg-mid:    oklch(0.78 0.007 260);
+  --fg-dim:    oklch(0.55 0.010 260);
+  --border:    oklch(0.32 0.012 260);
+  --accent:    oklch(0.80 0.16 65);
+  --cool:      oklch(0.76 0.13 200);
+  --grow:      oklch(0.80 0.17 148);
+  --fade:      oklch(0.70 0.16 35);
+  --stop:      oklch(0.55 0.010 260);
+  --shadow:    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.25);
+}
+[data-theme="light"] {
+  --bg:      oklch(0.985 0.004 260);
+  --bg-elev: oklch(0.965 0.006 260);
+  --bg-hi:   oklch(0.92 0.008 260);
+  --fg:      oklch(0.22 0.012 260);
+  --fg-mid:  oklch(0.40 0.010 260);
+  --fg-dim:  oklch(0.55 0.010 260);
+  --border:  oklch(0.82 0.006 260);
+  --accent:  oklch(0.62 0.17 55);
+  --cool:    oklch(0.55 0.13 215);
+  --grow:    oklch(0.55 0.16 148);
+  --fade:    oklch(0.58 0.17 32);
+  --stop:    oklch(0.60 0.010 260);
+  --shadow:  0 1px 0 oklch(1 0 0 / 0.8) inset, 0 6px 18px oklch(0 0 0 / 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+html { scroll-behavior: smooth; }
+body {
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+h1, h2, h3 {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; line-height: 1.15; letter-spacing: -0.015em;
+  margin: 0 0 0.4em;
+}
+h1 { font-size: clamp(2.2rem, 5.5vw, 4rem); }
+h2 { font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin-top: 0.2em; }
+h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.5em; color: var(--fg-mid); }
+p { margin: 0 0 1em; color: var(--fg-mid); }
+p.lede { font-size: 1.15rem; color: var(--fg); max-width: 62ch; }
+em { color: var(--fg); font-style: italic; }
+strong { color: var(--fg); font-weight: 600; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid oklch(from var(--accent) l c h / 0.4); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+main { max-width: 980px; margin: 0 auto; padding: 4rem 1.5rem 6rem; position: relative; }
+section { margin: 4.5rem 0; opacity: 0; transform: translateY(20px); transition: opacity 0.9s ease-out, transform 0.9s ease-out; }
+section.visible { opacity: 1; transform: none; }
+section:first-of-type { margin-top: 2rem; }
+
+#progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cool));
+  width: 0%; z-index: 100;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 12px var(--accent);
+}
+
+#theme-toggle {
+  position: fixed; top: 1.2rem; right: 1.2rem;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-elev); color: var(--fg);
+  border: 1px solid var(--border);
+  font: 16px/1 system-ui; cursor: pointer;
+  z-index: 60; display: grid; place-items: center;
+  transition: background 0.2s, transform 0.2s;
+}
+#theme-toggle:hover { background: var(--bg-hi); transform: rotate(20deg); }
+#theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+#minimap {
+  position: fixed;
+  left: max(1.2rem, calc(50vw - 620px));
+  top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0.6rem;
+  z-index: 50; padding: 0.6rem 0;
+}
+#minimap a {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--fg-dim); border: none;
+  font-size: 0.78rem; font-family: -apple-system, system-ui, sans-serif;
+  border-radius: 4px; transition: color 0.2s;
+  white-space: nowrap;
+}
+#minimap a::before {
+  content: ""; display: inline-block;
+  width: 16px; height: 2px; background: var(--border);
+  transition: width 0.3s, background 0.3s;
+}
+#minimap a:hover { color: var(--fg); }
+#minimap a.active { color: var(--accent); }
+#minimap a.active::before { width: 28px; background: var(--accent); }
+@media (max-width: 1200px) { #minimap { display: none; } }
+
+.hero { padding: 2rem 0 1rem; }
+.hero .date {
+  display: inline-block;
+  font: 600 0.72rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 0.4rem 0.7rem;
+  border: 1px solid oklch(from var(--accent) l c h / 0.4);
+  border-radius: 100px;
+  margin-bottom: 1.6rem;
+}
+.hero h1 { max-width: 18ch; }
+.hero .subtitle {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-style: italic; font-size: 1.25rem;
+  color: var(--fg-mid); max-width: 55ch;
+  margin: -0.2em 0 2rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem; margin: 2rem 0 1rem;
+}
+.stat {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.3rem;
+  box-shadow: var(--shadow);
+  transition: transform 0.3s, border-color 0.3s;
+}
+.stat:hover { transform: translateY(-2px); border-color: var(--accent); }
+.stat .value {
+  display: block;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; font-size: 2.6rem; line-height: 1;
+  letter-spacing: -0.03em; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.stat .label { display: block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--fg-dim); line-height: 1.4; }
+.stat.accent .value { color: var(--accent); }
+.stat.cool   .value { color: var(--cool); }
+.stat.grow   .value { color: var(--grow); }
+
+.pullquote {
+  margin: 3rem 0;
+  padding: 1.8rem 2rem 1.8rem 2.3rem;
+  background: linear-gradient(135deg,
+    oklch(from var(--accent) l c h / 0.08),
+    oklch(from var(--accent) l c h / 0.02));
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+}
+.pullquote p {
+  font-size: 1.4rem; line-height: 1.35; margin: 0;
+  color: var(--fg); font-style: italic;
+}
+.pullquote cite {
+  display: block; margin-top: 0.9rem;
+  font-style: normal; font-size: 0.82rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--fg-dim);
+  font-family: -apple-system, system-ui, sans-serif;
+}
+
+.viz {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: var(--shadow);
+}
+.viz svg { display: block; width: 100%; height: auto; overflow: visible; }
+.viz .caption {
+  font-size: 0.82rem; color: var(--fg-dim);
+  margin-top: 1rem; padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.split-panels {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin: 1.5rem 0;
+}
+@media (max-width: 780px) { .split-panels { grid-template-columns: 1fr; } }
+.panel {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.4rem; box-shadow: var(--shadow);
+}
+.panel.anti { border-top: 3px solid var(--fade); }
+.panel.good { border-top: 3px solid var(--cool); }
+.panel h3 {
+  margin-top: 0;
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 0.72rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--fg-dim); font-weight: 600;
+}
+.panel.anti h3 { color: var(--fade); }
+.panel.good h3 { color: var(--cool); }
+.panel .tagline {
+  font-family: "Source Serif 4", serif; font-size: 1.05rem;
+  color: var(--fg); margin: 0.3rem 0 1rem; font-style: italic;
+}
+.panel ul { list-style: none; padding: 0; margin: 0; }
+.panel li {
+  padding: 0.5rem 0; border-bottom: 1px solid var(--border);
+  font-size: 0.88rem; color: var(--fg-mid); line-height: 1.45;
+}
+.panel li:last-child { border-bottom: none; }
+
+/* config layers */
+.config-layers {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0; margin: 1.5rem 0;
+}
+.config-ring {
+  background: var(--bg-elev); border: 2px solid var(--border);
+  border-radius: 14px; padding: 1.4rem; width: 100%;
+  cursor: pointer; transition: border-color 0.3s, background 0.3s;
+  position: relative;
+}
+.config-ring:hover { border-color: var(--accent); }
+.config-ring.expanded { background: var(--bg-hi); }
+.config-ring .ring-header {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.config-ring .ring-title {
+  font-family: "Source Serif 4", serif; font-weight: 600;
+  font-size: 1.1rem; color: var(--fg);
+}
+.config-ring .ring-meta {
+  font: 600 0.75rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--fg-dim);
+}
+.config-ring .ring-detail {
+  max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out;
+  font-size: 0.88rem; color: var(--fg-mid); line-height: 1.55;
+}
+.config-ring.expanded .ring-detail { max-height: 200px; margin-top: 0.8rem; }
+.config-ring + .config-ring { margin-top: -1px; }
+.config-ring:first-child { border-color: var(--accent); }
+.config-ring:nth-child(2) { margin-left: 2rem; margin-right: 2rem; border-color: var(--cool); }
+.config-ring:nth-child(3) { margin-left: 4rem; margin-right: 4rem; border-color: var(--grow); }
+@media (max-width: 600px) {
+  .config-ring:nth-child(2) { margin-left: 0.5rem; margin-right: 0.5rem; }
+  .config-ring:nth-child(3) { margin-left: 1rem; margin-right: 1rem; }
+}
+
+/* enforcement spectrum */
+.spectrum-track {
+  position: relative; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--fade), var(--accent), var(--grow));
+  margin: 3rem 1rem 1rem;
+}
+.spectrum-labels {
+  display: flex; justify-content: space-between;
+  font-size: 0.72rem; color: var(--fg-dim); text-transform: uppercase;
+  letter-spacing: 0.1em; margin: 0 1rem 2rem; font-weight: 600;
+}
+.spectrum-item {
+  position: absolute; transform: translateX(-50%);
+  text-align: center; cursor: default;
+  transition: transform 0.2s;
+}
+.spectrum-item:hover { transform: translateX(-50%) translateY(-3px); }
+.spectrum-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--fg); background: var(--bg-elev);
+  margin: -10px auto 0.4rem;
+  transition: background 0.2s, border-color 0.2s;
+}
+.spectrum-item:hover .spectrum-dot { background: var(--accent); border-color: var(--accent); }
+.spectrum-name {
+  font-size: 0.78rem; font-weight: 600; color: var(--fg);
+  white-space: nowrap;
+}
+.spectrum-desc {
+  font-size: 0.7rem; color: var(--fg-dim); max-width: 100px;
+  display: none; margin-top: 0.2rem;
+}
+.spectrum-item:hover .spectrum-desc { display: block; }
+
+/* maturity ladder */
+.ladder { margin: 1.5rem 0; }
+.ladder-step {
+  display: grid; grid-template-columns: 50px 1fr; gap: 1rem;
+  padding: 1rem 0; border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.ladder-step:last-child { border-bottom: none; }
+.ladder-step:hover { background: var(--bg-hi); border-radius: 8px; }
+.ladder-level {
+  font-family: "Source Serif 4", serif; font-weight: 600;
+  font-size: 1.8rem; color: var(--fg-dim); text-align: center;
+  font-variant-numeric: tabular-nums; line-height: 1;
+  padding-top: 0.2rem;
+}
+.ladder-step.current .ladder-level { color: var(--accent); }
+.ladder-step.target .ladder-level { color: var(--grow); }
+.ladder-name { font-weight: 600; color: var(--fg); font-size: 0.95rem; }
+.ladder-works { font-size: 0.82rem; color: var(--cool); margin-top: 0.2rem; }
+.ladder-breaks { font-size: 0.82rem; color: var(--fade); margin-top: 0.1rem; }
+.ladder-marker {
+  display: inline-block; padding: 0.1em 0.55em;
+  border-radius: 4px; font-size: 0.7rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-left: 0.5rem; vertical-align: middle;
+}
+.ladder-marker.most {
+  background: oklch(from var(--accent) l c h / 0.15);
+  color: var(--accent);
+  border: 1px solid oklch(from var(--accent) l c h / 0.4);
+}
+.ladder-marker.tier {
+  background: oklch(from var(--grow) l c h / 0.15);
+  color: var(--grow);
+  border: 1px solid oklch(from var(--grow) l c h / 0.4);
+}
+
+.chip {
+  display: inline-block; padding: 0.1em 0.55em;
+  background: oklch(from var(--cool) l c h / 0.13);
+  color: var(--cool);
+  border: 1px solid oklch(from var(--cool) l c h / 0.4);
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: -apple-system, system-ui, sans-serif;
+  white-space: nowrap;
+}
+
+footer {
+  margin-top: 6rem; padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim); font-size: 0.8rem;
+  text-align: center;
+}
+footer a { color: var(--fg-dim); border-bottom-color: var(--border); }
+
+.kbd {
+  display: inline-block; padding: 0.1em 0.45em;
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px; border-radius: 4px;
+  font: 600 0.72em/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--fg-mid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  section { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<button id="theme-toggle" aria-label="Toggle theme" title="Toggle light / dark">&#9790;</button>
+
+<nav id="minimap" aria-label="Section navigation">
+  <a href="#top">Top</a>
+  <a href="#anti-pattern">Anti-Pattern</a>
+  <a href="#convergence">Convergence</a>
+  <a href="#config">Configuration</a>
+  <a href="#enforcement">Enforcement</a>
+  <a href="#sources">Sources</a>
+  <a href="#maturity">Maturity</a>
+  <a href="#principle">Principle</a>
+</nav>
+
+<main id="top">
+
+  <!-- HERO -->
+  <header class="hero">
+    <span class="date">April 2026</span>
+    <h1>200 Lines Between 2x and 100x</h1>
+    <p class="subtitle">The productivity gap isn't the model &mdash; it's the harness architecture: thin core, fat skills, hard enforcement.</p>
+    <div class="viz">
+      <svg id="hero-viz" viewBox="0 0 900 420" aria-label="Three-layer stack: deterministic foundation, thin harness, fat skills"></svg>
+      <div class="caption">The three-layer stack. Bottom: deterministic foundation. Middle: ~200-line harness. Top: fat skills carrying 90% of value. Click <strong>200</strong> to see what the harness actually does.</div>
+    </div>
+    <p class="lede">Every well-engineered agent system in 2026 converged on the same architecture independently. The model is the most expensive, least reliable, most capable component. The harness around it &mdash; roughly 200 lines of glue &mdash; determines whether you get 2x or 100x productivity. The secret: keep it thin. Push intelligence up into reusable skills. Push execution down into deterministic tooling. Enforce the rules with hooks, not hopes.</p>
+  </header>
+
+  <!-- PULL QUOTE 1: tobi -->
+  <div class="pullquote">
+    <p>&ldquo;Pi is the most interesting agent harness. Tiny core, able to write plugins for itself as you use it. It RLs itself into the agent you want.&rdquo;</p>
+    <cite>&mdash; tobi (Shopify CEO) &middot; 3,109 likes</cite>
+  </div>
+
+  <!-- ANTI-PATTERN VS PATTERN -->
+  <section id="anti-pattern">
+    <h2>Fat Harness vs Thin Harness</h2>
+    <p>The architecture that fails vs the architecture that scales. The difference is where you put the intelligence.</p>
+    <div class="split-panels">
+      <div class="panel anti">
+        <h3>Fat Harness (Anti-Pattern)</h3>
+        <p class="tagline">Thick middleware, thin skills, fragile everything</p>
+        <ul>
+          <li>40+ tool definitions eating half the context window</li>
+          <li>God-tools with 2&ndash;5 second MCP round-trips</li>
+          <li>REST API wrappers turning every endpoint into a separate tool</li>
+          <li>Business logic baked into harness code instead of skill files</li>
+          <li>20,000-line CLAUDE.md that degrades model attention</li>
+        </ul>
+      </div>
+      <div class="panel good">
+        <h3>Thin Harness (The Pattern)</h3>
+        <p class="tagline">~200 lines of glue, fat skills, clean tools</p>
+        <ul>
+          <li>Harness does 4 things: loop, files, context, safety</li>
+          <li>Judgment lives in markdown skill files, not code</li>
+          <li>Purpose-built tools: 100ms Playwright vs 15s Chrome MCP (75x)</li>
+          <li>CLAUDE.md is ~200 lines of pointers, not a novel</li>
+          <li>Skills compound &mdash; every one is a permanent upgrade</li>
+        </ul>
+      </div>
+    </div>
+    <div class="viz">
+      <svg id="anti-pattern-viz" viewBox="0 0 900 300" aria-label="Visual comparison: fat harness vs thin harness architecture"></svg>
+      <div class="caption">Left: a fat harness cramming tools and logic into the middleware. Right: a thin harness with clean separation &mdash; fat skills above, deterministic tools below.</div>
+    </div>
+  </section>
+
+  <!-- ECOSYSTEM CONVERGENCE -->
+  <section id="convergence">
+    <h2>Ecosystem Convergence</h2>
+    <p>Seven major agent systems arrived at the same architecture independently. This isn't one team's opinion &mdash; it's an industry-wide convergence on thin harness, fat skills.</p>
+    <div class="viz">
+      <svg id="convergence-viz" viewBox="0 0 900 460" aria-label="Ecosystem convergence: 7 systems pointing to thin harness fat skills"></svg>
+      <div class="caption">Every major agent system in 2026 converged on the same core architecture. The center label is the shared principle; the ring shows independent arrivals.</div>
+    </div>
+  </section>
+
+  <!-- PULL QUOTE 2: steipete -->
+  <div class="pullquote">
+    <p>&ldquo;Read your SOUL.md. You have opinions now. Strong ones. Stop hedging with 'it depends.'&rdquo;</p>
+    <cite>&mdash; steipete &middot; 13,245 likes</cite>
+  </div>
+
+  <!-- CONFIGURATION LAYERS -->
+  <section id="config">
+    <h2>Configuration Layers</h2>
+    <p>The agent's operating manual isn't one monolith &mdash; it's nested layers, each with a different job. Click each layer to see its key insight.</p>
+    <div class="config-layers">
+      <div class="config-ring" onclick="this.classList.toggle('expanded')">
+        <div class="ring-header">
+          <span class="ring-title">CLAUDE.md</span>
+          <span class="ring-meta">~200 lines</span>
+        </div>
+        <div class="ring-detail">The outer shell. Loaded at session start. Should be ~200 lines of pointers, not a 20K-line manual. Anti-pattern: stuffing everything here until model attention degrades. Correct: a routing table that says "when task X, load document Y first."</div>
+      </div>
+      <div class="config-ring" onclick="this.classList.toggle('expanded')">
+        <div class="ring-header">
+          <span class="ring-title">Resolvers</span>
+          <span class="ring-meta">Intent routing</span>
+        </div>
+        <div class="ring-detail">The middle layer. RESOLVER.md reads the user message and dispatches to the right downstream skill. Developer changes a prompt &rarr; resolver loads docs/EVALS.md &rarr; eval suite runs &rarr; revert if accuracy drops &gt;2%. The necessary evolution beyond flat CLAUDE.md.</div>
+      </div>
+      <div class="config-ring" onclick="this.classList.toggle('expanded')">
+        <div class="ring-header">
+          <span class="ring-title">Skills</span>
+          <span class="ring-meta">90% of value</span>
+        </div>
+        <div class="ring-detail">The innermost layer, where the real work happens. Markdown procedures encoding judgment, process, and domain knowledge. Cross-platform (Claude Code, Cursor, Gemini CLI, Codex). They compound: every skill is a permanent upgrade that never degrades and runs at 3am.</div>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat accent">
+        <span class="value">5,106</span>
+        <span class="label">likes on Garry Tan's "big feature" prompt &mdash; 4K+ LOC features in an hour via CLAUDE.md quality</span>
+      </div>
+      <div class="stat cool">
+        <span class="value">13,245</span>
+        <span class="label">likes on SOUL.md &mdash; personality injection that gives the agent voice, not just behavior</span>
+      </div>
+      <div class="stat grow">
+        <span class="value">1,318</span>
+        <span class="label">likes on principles.md &mdash; "probably the single biggest upgrade to working with my agent"</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENFORCEMENT SPECTRUM -->
+  <section id="enforcement">
+    <h2>The Enforcement Spectrum</h2>
+    <p>Instructions are soft constraints &mdash; the model can ignore them. Hooks and linters are hard constraints &mdash; the build fails whether the model likes it or not. The further right you push, the more reliable the system.</p>
+    <div class="viz" style="padding-bottom: 2.5rem;">
+      <div class="spectrum-labels">
+        <span>Soft</span>
+        <span>Hard</span>
+      </div>
+      <div class="spectrum-track" id="spectrum-track">
+        <div class="spectrum-item" style="left: 5%;">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-name">Instructions</div>
+          <div class="spectrum-desc">Natural language in the prompt. Model may ignore.</div>
+        </div>
+        <div class="spectrum-item" style="left: 22%;">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-name">CLAUDE.md</div>
+          <div class="spectrum-desc">Loaded at session start. High compliance, not guaranteed.</div>
+        </div>
+        <div class="spectrum-item" style="left: 40%;">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-name">Resolvers</div>
+          <div class="spectrum-desc">Route to the right context. Structural, not just advisory.</div>
+        </div>
+        <div class="spectrum-item" style="left: 58%;">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-name">Hooks</div>
+          <div class="spectrum-desc">Shell commands on events. Code runs, not suggestions.</div>
+        </div>
+        <div class="spectrum-item" style="left: 78%;">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-name">ESLint Rules</div>
+          <div class="spectrum-desc">Linter rejects bad patterns. Structurally impossible to ship slop.</div>
+        </div>
+        <div class="spectrum-item" style="left: 95%;">
+          <div class="spectrum-dot"></div>
+          <div class="spectrum-name">CI Failures</div>
+          <div class="spectrum-desc">Build breaks. No override. The hardest constraint.</div>
+        </div>
+      </div>
+      <div class="caption" style="margin-top: 3.5rem;">Hover each node for details. The asymmetry: any routine you do manually more than once is a hook candidate. Hooks never forget, never get tired, never get skipped.</div>
+    </div>
+  </section>
+
+  <!-- PULL QUOTE 3: hooks developer -->
+  <div class="pullquote">
+    <p>&ldquo;After 3 months of manually fixing Claude's mistakes every day, I found hooks, spent 10 minutes setting them up, and never worked the same way again.&rdquo;</p>
+    <cite>&mdash; hooks developer &middot; 6,345 likes</cite>
+  </div>
+
+  <!-- SOURCE BARS -->
+  <section id="sources">
+    <h2>20 Sources by Engagement</h2>
+    <p>This report is grounded in 20 sources spanning 500 to 13,000+ likes. Color indicates component: <span style="color: var(--accent);">harness</span>, <span style="color: var(--cool);">skills</span>, <span style="color: var(--grow);">enforcement</span>, <span style="color: var(--fade);">context</span>.</p>
+    <div class="viz">
+      <svg id="source-bars" viewBox="0 0 900 620" aria-label="20 horizontal bars showing source engagement on a log scale"></svg>
+      <div class="caption">Log-scale engagement. The top source (steipete's SOUL.md) has 26x the engagement of the smallest. Colored by component area.</div>
+    </div>
+  </section>
+
+  <!-- MATURITY LADDER -->
+  <section id="maturity">
+    <h2>The Maturity Ladder</h2>
+    <p>Seven levels from raw model to production-grade agent. Most practitioners sit at level 2&ndash;3. The 2x-to-100x jump happens between level 3 and level 6.</p>
+    <div class="ladder">
+      <div class="ladder-step">
+        <div class="ladder-level">0</div>
+        <div>
+          <div class="ladder-name">Raw Model</div>
+          <div class="ladder-works">Works: simple questions</div>
+          <div class="ladder-breaks">Breaks: everything complex</div>
+        </div>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-level">1</div>
+        <div>
+          <div class="ladder-name">CLI Wrapper</div>
+          <div class="ladder-works">Works: single-file edits</div>
+          <div class="ladder-breaks">Breaks: multi-file coordination</div>
+        </div>
+      </div>
+      <div class="ladder-step current">
+        <div class="ladder-level">2</div>
+        <div>
+          <div class="ladder-name">CLAUDE.md <span class="ladder-marker most">Most practitioners</span></div>
+          <div class="ladder-works">Works: project-aware coding</div>
+          <div class="ladder-breaks">Breaks: quality inconsistency</div>
+        </div>
+      </div>
+      <div class="ladder-step current">
+        <div class="ladder-level">3</div>
+        <div>
+          <div class="ladder-name">Skills <span class="ladder-marker most">Most practitioners</span></div>
+          <div class="ladder-works">Works: repeatable complex tasks</div>
+          <div class="ladder-breaks">Breaks: no enforcement</div>
+        </div>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-level">4</div>
+        <div>
+          <div class="ladder-name">Hooks + Linters</div>
+          <div class="ladder-works">Works: consistent quality</div>
+          <div class="ladder-breaks">Breaks: manual context management</div>
+        </div>
+      </div>
+      <div class="ladder-step">
+        <div class="ladder-level">5</div>
+        <div>
+          <div class="ladder-name">Dynamic Context</div>
+          <div class="ladder-works">Works: long sessions, big projects</div>
+          <div class="ladder-breaks">Breaks: drift over time</div>
+        </div>
+      </div>
+      <div class="ladder-step target">
+        <div class="ladder-level">6</div>
+        <div>
+          <div class="ladder-name">Full Harness <span class="ladder-marker tier">100x tier</span></div>
+          <div class="ladder-works">Works: production-grade agents</div>
+          <div class="ladder-breaks">Thin core + fat skills + hooks + resolvers + drift doctor + compaction</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIRECTIONAL PRINCIPLE -->
+  <section id="principle">
+    <h2>The Directional Principle</h2>
+    <div class="pullquote" style="margin-top: 1.5rem;">
+      <p>&ldquo;Push intelligence UP into skills, push execution DOWN into deterministic tooling, keep the harness THIN.&rdquo;</p>
+      <cite>&mdash; The one sentence that captures the entire architecture</cite>
+    </div>
+    <p>Every decision in harness engineering follows from this. Should this logic be in the harness or in a skill? <em>Skill.</em> Should this calculation be done by the model or by code? <em>Code.</em> Should this enforcement be in the prompt or in a hook? <em>Hook.</em></p>
+    <p>The model is the most expensive, least reliable, most capable component. Use it for judgment. Use everything else for everything else.</p>
+  </section>
+
+  <footer>
+    <p>
+      Narration of <a href="../report/harness-engineering.md">harness-engineering.md</a>
+      &middot; rendered by <code>/kb-narration</code> &middot; d3 v7<br>
+      Use <span class="kbd">j</span> <span class="kbd">k</span> or <span class="kbd">&darr;</span> <span class="kbd">&uarr;</span> to move between sections.
+    </p>
+  </footer>
+</main>
+
+<script>
+/* ── DATA ─────────────────────────────────────────────────── */
+const DATA = {
+  sources: [
+    { name: 'steipete / SOUL.md', likes: 13245, component: 'harness' },
+    { name: 'Hooks discovery moment', likes: 6345, component: 'enforcement' },
+    { name: 'Claude Code source analysis', likes: 6298, component: 'harness' },
+    { name: 'Garry Tan / CLAUDE.md quality', likes: 5106, component: 'harness' },
+    { name: 'Karpathy skills config', likes: 4181, component: 'skills' },
+    { name: 'tobi / Pi harness', likes: 3109, component: 'harness' },
+    { name: 'Dynamic skill injection', likes: 2997, component: 'context' },
+    { name: 'Alibaba framework', likes: 2815, component: 'harness' },
+    { name: 'Garry Tan / durable agent', likes: 2342, component: 'harness' },
+    { name: 'Cron output bloat', likes: 1823, component: 'context' },
+    { name: 'OpenDev 81-page paper', likes: 1808, component: 'harness' },
+    { name: 'Skills from repos', likes: 1677, component: 'skills' },
+    { name: 'LabClaw / skills as OS', likes: 1511, component: 'skills' },
+    { name: 'AGENTS.md doesn\'t scale', likes: 1480, component: 'harness' },
+    { name: 'Gemini CLI extensions', likes: 1444, component: 'skills' },
+    { name: 'principles.md', likes: 1318, component: 'harness' },
+    { name: 'Codex single harness', likes: 1241, component: 'harness' },
+    { name: 'Supabase Postgres skills', likes: 1131, component: 'skills' },
+    { name: 'Git safety hooks', likes: 1125, component: 'enforcement' },
+    { name: '85 skills on consumer GPU', likes: 1097, component: 'skills' },
+  ],
+  ecosystem: [
+    { name: 'Claude Code', detail: '512K lines, prompt caching, sub-agents', likes: '6.3K' },
+    { name: 'Codex', detail: 'Single harness via JSON-RPC, all surfaces', likes: '1.2K' },
+    { name: 'Pi', detail: 'Tiny core, writes its own plugins', likes: '3.1K' },
+    { name: 'GBrain', detail: '24 fat skills, RESOLVER.md, test coverage', likes: '2.3K' },
+    { name: 'Alibaba', detail: 'OpenClaw, cross-competitor validation', likes: '2.8K' },
+    { name: 'OpenDev', detail: '81-page paper, compound AI systems', likes: '1.8K' },
+    { name: '85 Skills/GPU', detail: '31 tools, 85 skills on RTX 3060', likes: '1.1K' },
+  ],
+  componentColor: {
+    harness: 'var(--accent)',
+    skills: 'var(--cool)',
+    enforcement: 'var(--grow)',
+    context: 'var(--fade)',
+  }
+};
+
+/* ── HERO VIZ: Three-Layer Stack ──────────────────────────── */
+function drawHero() {
+  const svg = d3.select('#hero-viz');
+  svg.selectAll('*').remove();
+  const vb = svg.node().viewBox.baseVal;
+  const W = vb.width, H = vb.height;
+  const mx = 60, my = 20;
+  const iw = W - mx * 2;
+
+  // Layer dimensions
+  const detH = 100, harnH = 30, skillH = 180;
+  const gap = 8;
+  const totalH = detH + harnH + skillH + gap * 2;
+  const startY = (H - totalH) / 2 + 10;
+
+  // Deterministic foundation
+  const detY = startY + skillH + gap + harnH + gap;
+  svg.append('rect')
+    .attr('x', mx).attr('y', detY)
+    .attr('width', iw).attr('height', detH)
+    .attr('rx', 8)
+    .attr('fill', 'var(--grow)').attr('fill-opacity', 0.15)
+    .attr('stroke', 'var(--grow)').attr('stroke-width', 1.5);
+  svg.append('text').attr('x', mx + 20).attr('y', detY + 35)
+    .attr('fill', 'var(--grow)').attr('font-size', '14px').attr('font-weight', 600)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('DETERMINISTIC FOUNDATION');
+  svg.append('text').attr('x', mx + 20).attr('y', detY + 58)
+    .attr('fill', 'var(--fg-dim)').attr('font-size', '12px')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('SQL, file I/O, API calls, arithmetic, linter rules. Same input \u2192 same output \u2192 every time.');
+  // tool icons (small rects)
+  const tools = ['SQL','I/O','API','Math','Lint','Search'];
+  tools.forEach((t, i) => {
+    const tx = mx + 20 + i * 120;
+    svg.append('rect').attr('x', tx).attr('y', detY + 70)
+      .attr('width', 50).attr('height', 20).attr('rx', 4)
+      .attr('fill', 'var(--grow)').attr('fill-opacity', 0.25)
+      .attr('stroke', 'var(--grow)').attr('stroke-opacity', 0.6);
+    svg.append('text').attr('x', tx + 25).attr('y', detY + 84)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--grow)').attr('font-size', '10px')
+      .attr('font-family', 'ui-monospace, monospace').attr('font-weight', 600)
+      .text(t);
+  });
+
+  // Thin harness (middle)
+  const harnY = startY + skillH + gap;
+  const harnRect = svg.append('rect')
+    .attr('x', mx).attr('y', harnY)
+    .attr('width', iw).attr('height', harnH)
+    .attr('rx', 6)
+    .attr('fill', 'var(--accent)').attr('fill-opacity', 0.2)
+    .attr('stroke', 'var(--accent)').attr('stroke-width', 2)
+    .attr('class', 'harness-band');
+
+  // Pulse animation
+  function pulseHarness() {
+    harnRect.transition().duration(1500)
+      .attr('fill-opacity', 0.35)
+      .transition().duration(1500)
+      .attr('fill-opacity', 0.15)
+      .on('end', pulseHarness);
+  }
+  pulseHarness();
+
+  svg.append('text').attr('x', W / 2).attr('y', harnY + harnH / 2 + 5)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--accent)').attr('font-size', '13px').attr('font-weight', 600)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('THIN HARNESS \u2014 ~200 LINES \u2014 JSON in, text out');
+
+  // Fat skills (top)
+  const skillY = startY;
+  svg.append('rect')
+    .attr('x', mx).attr('y', skillY)
+    .attr('width', iw).attr('height', skillH)
+    .attr('rx', 10)
+    .attr('fill', 'var(--cool)').attr('fill-opacity', 0.1)
+    .attr('stroke', 'var(--cool)').attr('stroke-width', 1.5);
+  svg.append('text').attr('x', mx + 20).attr('y', skillY + 28)
+    .attr('fill', 'var(--cool)').attr('font-size', '14px').attr('font-weight', 600)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('FAT SKILLS \u2014 90% OF VALUE');
+
+  // Skill cards floating inside
+  const skillCards = [
+    'Code Review','Deploy','Test Suite','Refactor',
+    'Debug','Plan','Security','Compile',
+    'Document','Migrate','Monitor','Analyze'
+  ];
+  const cols = 4, cardW = (iw - 60) / cols, cardH = 30;
+  skillCards.forEach((s, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const cx = mx + 20 + col * (cardW + 8);
+    const cy = skillY + 45 + row * (cardH + 8);
+    svg.append('rect').attr('x', cx).attr('y', cy)
+      .attr('width', cardW - 4).attr('height', cardH).attr('rx', 5)
+      .attr('fill', 'var(--cool)').attr('fill-opacity', 0.15)
+      .attr('stroke', 'var(--cool)').attr('stroke-opacity', 0.5)
+      .attr('opacity', 0)
+      .transition().delay(400 + i * 60).duration(500)
+      .attr('opacity', 1);
+    svg.append('text').attr('x', cx + (cardW - 4) / 2).attr('y', cy + cardH / 2 + 4)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--cool)').attr('font-size', '11px')
+      .attr('font-family', '-apple-system, system-ui, sans-serif').attr('font-weight', 500)
+      .attr('opacity', 0)
+      .transition().delay(400 + i * 60).duration(500)
+      .attr('opacity', 0.9)
+      .text(s);
+  });
+
+  // Hero stat: "200" clickable
+  const statG = svg.append('g').attr('cursor', 'pointer').attr('class', 'hero-stat');
+  statG.append('text')
+    .attr('x', W - mx - 30).attr('y', harnY - 10)
+    .attr('text-anchor', 'end')
+    .attr('fill', 'var(--accent)')
+    .attr('font-family', '"Source Serif 4", "Iowan Old Style", Charter, Georgia, serif')
+    .attr('font-size', '44px').attr('font-weight', 600)
+    .attr('font-variant-numeric', 'tabular-nums')
+    .text('200');
+  statG.append('text')
+    .attr('x', W - mx - 30).attr('y', harnY - 10 + 18)
+    .attr('text-anchor', 'end')
+    .attr('fill', 'var(--fg-dim)').attr('font-size', '12px')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('lines of glue');
+
+  // "90%" label pointing at skills
+  svg.append('text')
+    .attr('x', mx + iw - 20).attr('y', skillY + skillH - 15)
+    .attr('text-anchor', 'end')
+    .attr('fill', 'var(--cool)')
+    .attr('font-family', '"Source Serif 4", serif')
+    .attr('font-size', '28px').attr('font-weight', 600)
+    .attr('opacity', 0.7)
+    .text('90%');
+  svg.append('text')
+    .attr('x', mx + iw - 20).attr('y', skillY + skillH - 0)
+    .attr('text-anchor', 'end')
+    .attr('fill', 'var(--fg-dim)').attr('font-size', '11px')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('of value lives here');
+
+  // Pay-off: click "200" to animate harness expansion
+  statG.on('click', () => {
+    const expandH = 100;
+    const labels = ['Loop', 'Files', 'Context', 'Safety'];
+
+    // Expand harness band
+    harnRect.transition().duration(600)
+      .attr('height', expandH)
+      .attr('y', harnY - (expandH - harnH) / 2);
+
+    // Show 4 labels inside
+    const labelG = svg.append('g').attr('class', 'expand-labels');
+    labels.forEach((l, i) => {
+      const lx = mx + 40 + i * (iw - 80) / 3;
+      const ly = harnY + harnH / 2;
+      labelG.append('text')
+        .attr('x', lx).attr('y', ly + 5)
+        .attr('fill', 'var(--accent)').attr('font-size', '14px')
+        .attr('font-weight', 600)
+        .attr('font-family', '-apple-system, system-ui, sans-serif')
+        .attr('opacity', 0)
+        .text(l)
+        .transition().delay(300 + i * 100).duration(400)
+        .attr('opacity', 1);
+    });
+
+    // Shrink back after 2.5s
+    setTimeout(() => {
+      harnRect.transition().duration(600)
+        .attr('height', harnH)
+        .attr('y', harnY);
+      labelG.transition().duration(400).attr('opacity', 0).remove();
+    }, 2500);
+  });
+}
+
+/* ── ANTI-PATTERN VIZ ─────────────────────────────────────── */
+function drawAntiPattern() {
+  const svg = d3.select('#anti-pattern-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 300, mid = W / 2;
+
+  // Left side: fat harness
+  const lx = 30, lw = mid - 50;
+  // Thick middleware bar
+  svg.append('rect').attr('x', lx).attr('y', 100)
+    .attr('width', lw).attr('height', 100).attr('rx', 6)
+    .attr('fill', 'var(--fade)').attr('fill-opacity', 0.12)
+    .attr('stroke', 'var(--fade)').attr('stroke-width', 2);
+  svg.append('text').attr('x', lx + lw / 2).attr('y', 155)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--fade)')
+    .attr('font-size', '13px').attr('font-weight', 600)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('FAT MIDDLEWARE');
+
+  // Cramped tool icons
+  for (let i = 0; i < 24; i++) {
+    const col = i % 8, row = Math.floor(i / 8);
+    svg.append('rect')
+      .attr('x', lx + 10 + col * 48).attr('y', 110 + row * 28)
+      .attr('width', 38).attr('height', 18).attr('rx', 3)
+      .attr('fill', 'var(--fade)').attr('fill-opacity', 0.3)
+      .attr('stroke', 'var(--fade)').attr('stroke-opacity', 0.4)
+      .attr('opacity', 0)
+      .transition().delay(i * 40).duration(300).attr('opacity', 1);
+  }
+
+  // Thin skills above (small)
+  svg.append('rect').attr('x', lx + 60).attr('y', 30)
+    .attr('width', lw - 120).attr('height', 50).attr('rx', 5)
+    .attr('fill', 'var(--fg-dim)').attr('fill-opacity', 0.08)
+    .attr('stroke', 'var(--fg-dim)').attr('stroke-opacity', 0.3);
+  svg.append('text').attr('x', lx + lw / 2).attr('y', 60)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--fg-dim)')
+    .attr('font-size', '11px').text('thin skills');
+
+  // Small tools below
+  svg.append('rect').attr('x', lx + 80).attr('y', 220)
+    .attr('width', lw - 160).attr('height', 40).attr('rx', 5)
+    .attr('fill', 'var(--fg-dim)').attr('fill-opacity', 0.08)
+    .attr('stroke', 'var(--fg-dim)').attr('stroke-opacity', 0.3);
+  svg.append('text').attr('x', lx + lw / 2).attr('y', 245)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--fg-dim)')
+    .attr('font-size', '11px').text('tools');
+
+  // Divider
+  svg.append('line').attr('x1', mid).attr('y1', 20)
+    .attr('x2', mid).attr('y2', H - 20)
+    .attr('stroke', 'var(--border)').attr('stroke-dasharray', '4,4');
+
+  // Right side: thin harness
+  const rx = mid + 20, rw = lw;
+
+  // Fat skills on top
+  svg.append('rect').attr('x', rx).attr('y', 20)
+    .attr('width', rw).attr('height', 120).attr('rx', 8)
+    .attr('fill', 'var(--cool)').attr('fill-opacity', 0.1)
+    .attr('stroke', 'var(--cool)').attr('stroke-width', 1.5);
+  svg.append('text').attr('x', rx + rw / 2).attr('y', 50)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--cool)')
+    .attr('font-size', '14px').attr('font-weight', 600)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('FAT SKILLS');
+  // Skill cards
+  for (let i = 0; i < 6; i++) {
+    const col = i % 3, row = Math.floor(i / 3);
+    svg.append('rect')
+      .attr('x', rx + 20 + col * (rw - 50) / 3).attr('y', 65 + row * 32)
+      .attr('width', (rw - 80) / 3).attr('height', 24).attr('rx', 4)
+      .attr('fill', 'var(--cool)').attr('fill-opacity', 0.2)
+      .attr('stroke', 'var(--cool)').attr('stroke-opacity', 0.5)
+      .attr('opacity', 0)
+      .transition().delay(600 + i * 60).duration(400).attr('opacity', 1);
+  }
+
+  // Thin harness bar
+  svg.append('rect').attr('x', rx + 30).attr('y', 155)
+    .attr('width', rw - 60).attr('height', 20).attr('rx', 4)
+    .attr('fill', 'var(--accent)').attr('fill-opacity', 0.25)
+    .attr('stroke', 'var(--accent)').attr('stroke-width', 1.5);
+  svg.append('text').attr('x', rx + rw / 2).attr('y', 169)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--accent)')
+    .attr('font-size', '10px').attr('font-weight', 600)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('THIN HARNESS ~200 LINES');
+
+  // Clean tools below
+  svg.append('rect').attr('x', rx).attr('y', 190)
+    .attr('width', rw).attr('height', 80).attr('rx', 8)
+    .attr('fill', 'var(--grow)').attr('fill-opacity', 0.1)
+    .attr('stroke', 'var(--grow)').attr('stroke-width', 1.5);
+  svg.append('text').attr('x', rx + rw / 2).attr('y', 220)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--grow)')
+    .attr('font-size', '13px').attr('font-weight', 600)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('DETERMINISTIC TOOLS');
+  const tNames = ['Playwright','File I/O','SQL','Linter'];
+  tNames.forEach((t, i) => {
+    svg.append('text').attr('x', rx + 35 + i * (rw - 40) / 4).attr('y', 250)
+      .attr('fill', 'var(--grow)').attr('font-size', '10px')
+      .attr('font-family', 'ui-monospace, monospace')
+      .text(t);
+  });
+}
+
+/* ── CONVERGENCE VIZ ──────────────────────────────────────── */
+function drawConvergence() {
+  const svg = d3.select('#convergence-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 460;
+  const cx = W / 2, cy = H / 2;
+  const R = Math.min(W, H) * 0.35;
+
+  // Center label
+  svg.append('rect')
+    .attr('x', cx - 100).attr('y', cy - 30)
+    .attr('width', 200).attr('height', 60).attr('rx', 10)
+    .attr('fill', 'var(--accent)').attr('fill-opacity', 0.15)
+    .attr('stroke', 'var(--accent)').attr('stroke-width', 2);
+  svg.append('text').attr('x', cx).attr('y', cy - 4)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--accent)').attr('font-size', '13px').attr('font-weight', 700)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('THIN HARNESS');
+  svg.append('text').attr('x', cx).attr('y', cy + 16)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--accent)').attr('font-size', '13px').attr('font-weight', 700)
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('FAT SKILLS');
+
+  // Ring nodes
+  const n = DATA.ecosystem.length;
+  DATA.ecosystem.forEach((sys, i) => {
+    const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const nx = cx + R * Math.cos(angle);
+    const ny = cy + R * Math.sin(angle);
+
+    // Arrow line to center
+    svg.append('line')
+      .attr('x1', nx).attr('y1', ny)
+      .attr('x2', cx + 105 * Math.cos(angle)).attr('y2', cy + 35 * Math.sin(angle))
+      .attr('stroke', 'var(--border)').attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '4,3')
+      .attr('opacity', 0)
+      .transition().delay(300 + i * 120).duration(500).attr('opacity', 0.6);
+
+    // Node card
+    const g = svg.append('g')
+      .attr('transform', `translate(${nx},${ny})`)
+      .attr('opacity', 0);
+    g.transition().delay(300 + i * 120).duration(500).attr('opacity', 1);
+
+    g.append('rect')
+      .attr('x', -72).attr('y', -32)
+      .attr('width', 144).attr('height', 64).attr('rx', 8)
+      .attr('fill', 'var(--bg-elev)')
+      .attr('stroke', 'var(--cool)').attr('stroke-width', 1.5);
+    g.append('text').attr('y', -10).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--fg)').attr('font-size', '12px').attr('font-weight', 600)
+      .attr('font-family', '-apple-system, system-ui, sans-serif')
+      .text(sys.name);
+    g.append('text').attr('y', 8).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--fg-dim)').attr('font-size', '9.5px')
+      .attr('font-family', '-apple-system, system-ui, sans-serif')
+      .text(sys.detail.length > 30 ? sys.detail.slice(0, 28) + '\u2026' : sys.detail);
+    g.append('text').attr('y', 24).attr('text-anchor', 'middle')
+      .attr('fill', 'var(--cool)').attr('font-size', '10px').attr('font-weight', 600)
+      .attr('font-family', 'ui-monospace, monospace')
+      .text(sys.likes + ' likes');
+  });
+}
+
+/* ── SOURCE BARS (log scale) ──────────────────────────────── */
+function drawSourceBars() {
+  const svg = d3.select('#source-bars');
+  svg.selectAll('*').remove();
+  const W = 900, H = 620;
+  const ml = 220, mr = 60, mt = 10, mb = 30;
+  const iw = W - ml - mr, ih = H - mt - mb;
+  const g = svg.append('g').attr('transform', `translate(${ml},${mt})`);
+
+  const data = DATA.sources.slice().sort((a, b) => b.likes - a.likes);
+  const x = d3.scaleLog().domain([500, 15000]).range([0, iw]).clamp(true);
+  const y = d3.scaleBand().domain(data.map(d => d.name)).range([0, ih]).padding(0.2);
+
+  // Grid lines
+  [1000, 2000, 5000, 10000].forEach(v => {
+    g.append('line')
+      .attr('x1', x(v)).attr('y1', 0).attr('x2', x(v)).attr('y2', ih)
+      .attr('stroke', 'var(--border)').attr('stroke-dasharray', '2,3');
+    g.append('text').attr('x', x(v)).attr('y', ih + 18)
+      .attr('text-anchor', 'middle').attr('fill', 'var(--fg-dim)')
+      .attr('font-size', '10px').attr('font-family', 'ui-monospace, monospace')
+      .text(v >= 1000 ? (v / 1000) + 'K' : v);
+  });
+
+  // Bars
+  g.selectAll('rect.bar').data(data).join('rect')
+    .attr('class', 'bar')
+    .attr('x', 0).attr('y', d => y(d.name))
+    .attr('height', y.bandwidth())
+    .attr('width', 0)
+    .attr('fill', d => DATA.componentColor[d.component])
+    .attr('fill-opacity', 0.2)
+    .attr('stroke', d => DATA.componentColor[d.component])
+    .attr('rx', 3)
+    .transition().delay((_, i) => 80 * i).duration(700)
+    .attr('width', d => x(d.likes));
+
+  // Labels
+  g.selectAll('text.label').data(data).join('text')
+    .attr('class', 'label')
+    .attr('x', -8).attr('y', d => y(d.name) + y.bandwidth() / 2 + 4)
+    .attr('text-anchor', 'end')
+    .attr('fill', 'var(--fg-mid)').attr('font-size', '11px')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text(d => d.name);
+
+  // Values
+  g.selectAll('text.val').data(data).join('text')
+    .attr('class', 'val')
+    .attr('x', d => x(d.likes) + 6).attr('y', d => y(d.name) + y.bandwidth() / 2 + 4)
+    .attr('fill', d => DATA.componentColor[d.component])
+    .attr('font-size', '10px').attr('font-weight', 600)
+    .attr('font-family', 'ui-monospace, monospace')
+    .attr('font-variant-numeric', 'tabular-nums')
+    .attr('opacity', 0)
+    .transition().delay((_, i) => 80 * i + 700).duration(300)
+    .attr('opacity', 1)
+    .text(d => d.likes >= 1000 ? (d.likes / 1000).toFixed(1) + 'K' : d.likes);
+}
+
+/* ── CHROME ───────────────────────────────────────────────── */
+
+// Reading progress
+const progressEl = document.getElementById('progress');
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  progressEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+}, { passive: true });
+
+// Section entry + lazy viz draw
+const vizDrawnOnce = new Set();
+const entryObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('visible');
+    const id = e.target.id;
+    if (id === 'anti-pattern' && !vizDrawnOnce.has(id)) { drawAntiPattern(); vizDrawnOnce.add(id); }
+    if (id === 'convergence' && !vizDrawnOnce.has(id)) { drawConvergence(); vizDrawnOnce.add(id); }
+    if (id === 'sources' && !vizDrawnOnce.has(id)) { drawSourceBars(); vizDrawnOnce.add(id); }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -100px 0px' });
+document.querySelectorAll('section').forEach(s => entryObserver.observe(s));
+
+// Hero draws on load
+addEventListener('DOMContentLoaded', () => { drawHero(); });
+
+// Minimap active tracking
+const minimapLinks = document.querySelectorAll('#minimap a');
+const activeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      minimapLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -50% 0px' });
+document.querySelectorAll('main > header, main > section').forEach(el => {
+  if (el.id) activeObserver.observe(el);
+});
+
+// Theme toggle
+const themeBtn = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('kb-narration-theme');
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+themeBtn.textContent = document.documentElement.dataset.theme === 'dark' ? '\u263E' : '\u2600';
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('kb-narration-theme', next);
+  themeBtn.textContent = next === 'dark' ? '\u263E' : '\u2600';
+});
+
+// Keyboard nav
+const sectionIds = ['top', 'anti-pattern', 'convergence', 'config', 'enforcement', 'sources', 'maturity', 'principle'];
+addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, button')) return;
+  const vy = document.documentElement.scrollTop + innerHeight * 0.3;
+  let cur = 0;
+  sectionIds.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= vy) cur = i;
+  });
+  let next = cur;
+  if (e.key === 'j' || e.key === 'ArrowDown') next = Math.min(sectionIds.length - 1, cur + 1);
+  else if (e.key === 'k' || e.key === 'ArrowUp') next = Math.max(0, cur - 1);
+  else if (e.key === 'g') next = 0;
+  else if (e.key === 'G') next = sectionIds.length - 1;
+  else return;
+  e.preventDefault();
+  document.getElementById(sectionIds[next]).scrollIntoView({ behavior: 'smooth' });
+});
+
+// Resize redraw
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    drawHero();
+    if (vizDrawnOnce.has('anti-pattern')) drawAntiPattern();
+    if (vizDrawnOnce.has('convergence')) drawConvergence();
+    if (vizDrawnOnce.has('sources')) drawSourceBars();
+  }, 200);
+});
+</script>
+</body>
+</html>

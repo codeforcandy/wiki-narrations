@@ -1,0 +1,1200 @@
+<!doctype html>
+<!--
+  KB Narration: The Agent Memory Stack
+  Source: report/agent-memory-stack.md
+  Forked from: references/template.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Agent Memory Stack · KB Narration</title>
+<meta name="description" content="Interactive narration of the Agent Memory Stack report. 5 layers from flat files to self-designed memory, 19 sources, the compounding math.">
+<script src="https://unpkg.com/d3@7/dist/d3.min.js" defer></script>
+<style>
+/* ── palette ─────────────────────────────────────────────── */
+:root {
+  --bg:        oklch(0.16 0.010 260);
+  --bg-elev:   oklch(0.21 0.012 260);
+  --bg-hi:     oklch(0.26 0.014 260);
+  --fg:        oklch(0.95 0.004 260);
+  --fg-mid:    oklch(0.78 0.007 260);
+  --fg-dim:    oklch(0.55 0.010 260);
+  --border:    oklch(0.32 0.012 260);
+  --accent:    oklch(0.80 0.16 65);
+  --cool:      oklch(0.76 0.13 200);
+  --grow:      oklch(0.80 0.17 148);
+  --fade:      oklch(0.70 0.16 35);
+  --stop:      oklch(0.55 0.010 260);
+  --layer5:    oklch(0.76 0.14 310);
+  --shadow:    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.25);
+}
+[data-theme="light"] {
+  --bg:      oklch(0.985 0.004 260);
+  --bg-elev: oklch(0.965 0.006 260);
+  --bg-hi:   oklch(0.92 0.008 260);
+  --fg:      oklch(0.22 0.012 260);
+  --fg-mid:  oklch(0.40 0.010 260);
+  --fg-dim:  oklch(0.55 0.010 260);
+  --border:  oklch(0.82 0.006 260);
+  --accent:  oklch(0.62 0.17 55);
+  --cool:    oklch(0.55 0.13 215);
+  --grow:    oklch(0.55 0.16 148);
+  --fade:    oklch(0.58 0.17 32);
+  --stop:    oklch(0.60 0.010 260);
+  --layer5:  oklch(0.55 0.14 310);
+  --shadow:  0 1px 0 oklch(1 0 0 / 0.8) inset, 0 6px 18px oklch(0 0 0 / 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+html { scroll-behavior: smooth; }
+body {
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+h1, h2, h3 {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; line-height: 1.15; letter-spacing: -0.015em;
+  margin: 0 0 0.4em;
+}
+h1 { font-size: clamp(2.2rem, 5.5vw, 4rem); }
+h2 { font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin-top: 0.2em; }
+h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.5em; color: var(--fg-mid); }
+p { margin: 0 0 1em; color: var(--fg-mid); }
+p.lede { font-size: 1.15rem; color: var(--fg); max-width: 62ch; }
+em { color: var(--fg); font-style: italic; }
+strong { color: var(--fg); font-weight: 600; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid oklch(from var(--accent) l c h / 0.4); }
+a:hover, a:focus-visible { border-bottom-color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+main { max-width: 980px; margin: 0 auto; padding: 4rem 1.5rem 6rem; position: relative; }
+section { margin: 4.5rem 0; opacity: 0; transform: translateY(20px); transition: opacity 0.9s ease-out, transform 0.9s ease-out; }
+section.visible { opacity: 1; transform: none; }
+section:first-of-type { margin-top: 2rem; }
+
+#progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cool));
+  width: 0%; z-index: 100;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 12px var(--accent);
+}
+
+#theme-toggle {
+  position: fixed; top: 1.2rem; right: 1.2rem;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg-elev); color: var(--fg);
+  border: 1px solid var(--border);
+  font: 16px/1 system-ui; cursor: pointer;
+  z-index: 60; display: grid; place-items: center;
+  transition: background 0.2s, transform 0.2s;
+}
+#theme-toggle:hover { background: var(--bg-hi); transform: rotate(20deg); }
+#theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+#minimap {
+  position: fixed;
+  left: max(1.2rem, calc(50vw - 620px));
+  top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 0.6rem;
+  z-index: 50; padding: 0.6rem 0;
+}
+#minimap a {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.25rem 0.5rem;
+  color: var(--fg-dim); border: none;
+  font-size: 0.78rem; font-family: -apple-system, system-ui, sans-serif;
+  border-radius: 4px; transition: color 0.2s;
+  white-space: nowrap;
+}
+#minimap a::before {
+  content: ""; display: inline-block;
+  width: 16px; height: 2px; background: var(--border);
+  transition: width 0.3s, background 0.3s;
+}
+#minimap a:hover { color: var(--fg); }
+#minimap a.active { color: var(--accent); }
+#minimap a.active::before { width: 28px; background: var(--accent); }
+@media (max-width: 1200px) { #minimap { display: none; } }
+
+.hero { padding: 2rem 0 1rem; }
+.hero .date {
+  display: inline-block;
+  font: 600 0.72rem/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 0.4rem 0.7rem;
+  border: 1px solid oklch(from var(--accent) l c h / 0.4);
+  border-radius: 100px;
+  margin-bottom: 1.6rem;
+}
+.hero h1 { max-width: 18ch; }
+.hero .subtitle {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-style: italic; font-size: 1.25rem;
+  color: var(--fg-mid); max-width: 55ch;
+  margin: -0.2em 0 2rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem; margin: 2rem 0 1rem;
+}
+.stat {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.3rem;
+  box-shadow: var(--shadow);
+  transition: transform 0.3s, border-color 0.3s;
+}
+.stat:hover { transform: translateY(-2px); border-color: var(--accent); }
+.stat .value {
+  display: block;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; font-size: 2.6rem; line-height: 1;
+  letter-spacing: -0.03em; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.stat .label { display: block; margin-top: 0.5rem; font-size: 0.85rem; color: var(--fg-dim); line-height: 1.4; }
+.stat.accent .value { color: var(--accent); }
+.stat.cool   .value { color: var(--cool); }
+.stat.grow   .value { color: var(--grow); }
+.stat.accent, .stat.accent:hover { cursor: pointer; }
+
+.pullquote {
+  margin: 3rem 0;
+  padding: 1.8rem 2rem 1.8rem 2.3rem;
+  background: linear-gradient(135deg,
+    oklch(from var(--accent) l c h / 0.08),
+    oklch(from var(--accent) l c h / 0.02));
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+}
+.pullquote p {
+  font-size: 1.4rem; line-height: 1.35; margin: 0;
+  color: var(--fg); font-style: italic;
+}
+.pullquote cite {
+  display: block; margin-top: 0.9rem;
+  font-style: normal; font-size: 0.82rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--fg-dim);
+  font-family: -apple-system, system-ui, sans-serif;
+}
+
+.viz {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: var(--shadow);
+}
+.viz svg { display: block; width: 100%; height: auto; overflow: visible; }
+.viz .caption {
+  font-size: 0.82rem; color: var(--fg-dim);
+  margin-top: 1rem; padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.actions {
+  display: grid; grid-template-columns: 1.1fr 0.85fr 0.85fr; gap: 1rem;
+  margin-top: 2rem;
+}
+@media (max-width: 820px) { .actions { grid-template-columns: 1fr; } }
+.col {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-top-width: 3px;
+  border-radius: 10px;
+  padding: 1.3rem;
+  box-shadow: var(--shadow);
+}
+.col.immediate { border-top-color: var(--accent); }
+.col.watch     { border-top-color: var(--cool); }
+.col.skip      { border-top-color: var(--stop); }
+.col h3 {
+  margin: 0 0 1rem;
+  font: 600 0.72rem/1 -apple-system, system-ui, sans-serif;
+  letter-spacing: 0.13em; text-transform: uppercase; color: var(--fg-dim);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.col.immediate h3 { color: var(--accent); }
+.col.watch h3     { color: var(--cool); }
+.col.skip h3      { color: var(--stop); }
+.col h3::before {
+  content: ""; display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 0 3px oklch(from currentColor l c h / 0.18);
+}
+.card { padding: 0.85rem 0; border-bottom: 1px solid var(--border); }
+.card:last-child { border-bottom: none; padding-bottom: 0; }
+.card .title { font-size: 0.92rem; color: var(--fg); font-weight: 500; line-height: 1.35; margin-bottom: 0.25rem; }
+.card .why   { font-size: 0.8rem; color: var(--fg-dim); line-height: 1.45; }
+
+/* ── stack layers ───────────────────────────────────── */
+.stack-layers { display: flex; flex-direction: column-reverse; gap: 0; margin: 1.5rem 0; }
+.stack-layer {
+  display: grid; grid-template-columns: 2.2rem 1fr;
+  align-items: center; gap: 0.8rem;
+  padding: 1rem 1.2rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+  opacity: 0; transform: translateY(12px);
+}
+.stack-layer.visible { opacity: 1; transform: none; }
+.stack-layer:first-child { border-radius: 0 0 12px 12px; }
+.stack-layer:last-child { border-radius: 12px 12px 0 0; }
+.stack-layer:hover { background: var(--bg-hi); border-color: var(--accent); transform: translateY(-1px); }
+.stack-layer .num {
+  font-family: "Source Serif 4", serif; font-weight: 600; font-size: 1.6rem;
+  text-align: center; line-height: 1;
+}
+.stack-layer .info { display: flex; flex-direction: column; gap: 0.15rem; }
+.stack-layer .name { font-weight: 600; color: var(--fg); font-size: 0.95rem; }
+.stack-layer .tool {
+  font: 0.75rem "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--fg-dim);
+}
+.stack-layer .desc { font-size: 0.82rem; color: var(--fg-mid); }
+.stack-layer .scale {
+  font-size: 0.72rem; color: var(--fg-dim); letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ── rag matrix ──────────────────────────────────────── */
+.rag-matrix { margin: 1.5rem 0; }
+.rag-row {
+  display: grid; grid-template-columns: 7rem 1fr 1fr; gap: 0;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.rag-row:hover { background: var(--bg-hi); }
+.rag-row.header {
+  font: 600 0.72rem/1 -apple-system, system-ui, sans-serif;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--fg-dim); background: none;
+}
+.rag-row.header:hover { background: none; }
+.rag-cell {
+  padding: 0.8rem 1rem; font-size: 0.88rem; color: var(--fg-mid);
+}
+.rag-cell.size { font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace; font-size: 0.82rem; color: var(--fg); font-weight: 600; }
+.rag-cell.rec { color: var(--fg); font-weight: 500; }
+.rag-cell .zone {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  margin-right: 0.5rem; vertical-align: middle;
+}
+@media (max-width: 600px) {
+  .rag-row { grid-template-columns: 5rem 1fr; }
+  .rag-cell.why-cell { display: none; }
+}
+
+/* ── maturity ladder ─────────────────────────────────── */
+.ladder { margin: 1.5rem 0; display: flex; flex-direction: column-reverse; gap: 0; }
+.ladder-step {
+  display: grid; grid-template-columns: 2.5rem 1fr 7rem 6rem;
+  align-items: center; gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+  cursor: default;
+}
+.ladder-step:hover { background: var(--bg-hi); }
+.ladder-step .lvl {
+  font-family: "Source Serif 4", serif; font-weight: 600; font-size: 1.1rem;
+  text-align: center;
+}
+.ladder-step .approach { font-size: 0.88rem; color: var(--fg); font-weight: 500; }
+.ladder-step .scope { font-size: 0.78rem; color: var(--fg-dim); }
+.ladder-step .cont { font-size: 0.78rem; color: var(--fg-dim); }
+.ladder-step .marker {
+  grid-column: 1 / -1; font-size: 0.72rem; letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 0.3rem 0.8rem; margin: 0.2rem 0;
+  border-radius: 4px; text-align: center; font-weight: 600;
+}
+.marker.most { background: oklch(from var(--cool) l c h / 0.12); color: var(--cool); }
+.marker.tenx { background: oklch(from var(--accent) l c h / 0.12); color: var(--accent); }
+.marker.research { background: oklch(from var(--layer5) l c h / 0.12); color: var(--layer5); }
+.ladder-step.glow { background: oklch(from var(--layer5) l c h / 0.06); }
+@media (max-width: 600px) {
+  .ladder-step { grid-template-columns: 2rem 1fr 5rem; }
+  .ladder-step .cont { display: none; }
+}
+
+.chip {
+  display: inline-block; padding: 0.1em 0.55em;
+  background: oklch(from var(--cool) l c h / 0.13);
+  color: var(--cool);
+  border: 1px solid oklch(from var(--cool) l c h / 0.4);
+  border-radius: 4px; font-size: 0.85em;
+  font-family: -apple-system, system-ui, sans-serif;
+  white-space: nowrap;
+}
+
+footer {
+  margin-top: 6rem; padding-top: 2rem;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim); font-size: 0.8rem;
+  text-align: center;
+}
+footer a { color: var(--fg-dim); border-bottom-color: var(--border); }
+
+.kbd {
+  display: inline-block; padding: 0.1em 0.45em;
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px; border-radius: 4px;
+  font: 600 0.72em/1 "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--fg-mid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  section { opacity: 1; transform: none; }
+  .stack-layer { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+<button id="theme-toggle" aria-label="Toggle theme" title="Toggle light / dark">☾</button>
+
+<nav id="minimap" aria-label="Section navigation">
+  <a href="#top">Top</a>
+  <a href="#stack">The Stack</a>
+  <a href="#rag-decision">RAG vs Wiki</a>
+  <a href="#moat">Moat Math</a>
+  <a href="#sources">Sources</a>
+  <a href="#maturity">Maturity</a>
+  <a href="#convergence">What's Next</a>
+</nav>
+
+<main id="top">
+
+  <!-- ━━━ HERO ━━━ -->
+  <header class="hero">
+    <span class="date">Agent Memory Stack · 2026-04-16</span>
+    <h1>5 layers that end the amnesia loop.</h1>
+    <p class="subtitle">Every AI session starts from zero — the memory stack is what makes agents compound instead of reset.</p>
+    <div class="viz">
+      <svg id="hero-viz" viewBox="0 0 900 420" aria-label="Hero: amnesia loop animation then 5 stack layers catching knowledge"></svg>
+      <div class="caption">
+        A context bar fills with knowledge (green), then empties at session end (rust flash). Three cycles of amnesia.
+        Then the five stack layers appear — and the knowledge stops resetting. Click
+        <strong style="color:var(--accent)">5 layers</strong> below to replay the stack sequence.
+      </div>
+    </div>
+    <p class="lede">
+      Standard AI usage is stateless. Ask, get answer, close tab, start over. The people who broke out
+      of this loop — Karpathy with LLM knowledge bases (55K likes), Garry Tan with GBrain (5.7K likes),
+      the Claude Code team with auto-memory (15.8K likes) — didn't just get more productive. They changed
+      the fundamental economics: costs go down as context goes up, because the agent stops
+      re-learning what it already knew.
+    </p>
+  </header>
+
+  <div class="stat-grid">
+    <div class="stat accent" id="stat-hero" title="Click to replay the stack lighting sequence" style="cursor:pointer">
+      <span class="value">5 layers</span>
+      <span class="label">from flat files to self-designed memory</span>
+    </div>
+    <div class="stat cool">
+      <span class="value">19</span>
+      <span class="label">sources analyzed<br><em>164 to 55,313 likes</em></span>
+    </div>
+    <div class="stat grow">
+      <span class="value">365d</span>
+      <span class="label">to build an unreplicable moat</span>
+    </div>
+  </div>
+
+  <!-- ━━━ PULLQUOTE 1: Karpathy ━━━ -->
+  <div class="pullquote">
+    <p>"Something I'm finding very useful is building up LLM Knowledge Bases... the token throughput is shifting from code to knowledge."</p>
+    <cite>— Andrej Karpathy · 55,313 likes</cite>
+  </div>
+
+  <!-- ━━━ THE STACK ━━━ -->
+  <section id="stack">
+    <h2>The Stack: Five Layers</h2>
+    <p>
+      Think of it like a network stack or geological cross-section. Each layer handles a different scale.
+      The bottom is simple and universal; the top is experimental and rare. Most people never get past
+      layer 2. The 10x practitioners live at layers 4 and 5. Click any layer to jump to its detail section below.
+    </p>
+
+    <div class="stack-layers" id="stack-viz">
+      <div class="stack-layer" data-layer="1" style="transition-delay:0s">
+        <div class="num" style="color:var(--accent)">1</div>
+        <div class="info">
+          <span class="name">Flat Files</span>
+          <span class="tool">MEMORY.md, CLAUDE.md</span>
+          <span class="desc">Markdown the agent reads at session start. Basic continuity.</span>
+          <span class="scale">Scale: ~100 files</span>
+        </div>
+      </div>
+      <div class="stack-layer" data-layer="2" style="transition-delay:0.1s">
+        <div class="num" style="color:var(--cool)">2</div>
+        <div class="info">
+          <span class="name">Structured Wiki</span>
+          <span class="tool">Obsidian, raw/ → wiki/ → reports/</span>
+          <span class="desc">Compounding knowledge with cross-references. The Karpathy method.</span>
+          <span class="scale">Scale: ~1,000 pages</span>
+        </div>
+      </div>
+      <div class="stack-layer" data-layer="3" style="transition-delay:0.2s">
+        <div class="num" style="color:var(--grow)">3</div>
+        <div class="info">
+          <span class="name">Hybrid Retrieval</span>
+          <span class="tool">GBrain, pgvector + tsvector + RRF</span>
+          <span class="desc">Vector + full-text + ranking. Millisecond retrieval at scale.</span>
+          <span class="scale">Scale: 10,000+ docs</span>
+        </div>
+      </div>
+      <div class="stack-layer" data-layer="4" style="transition-delay:0.3s">
+        <div class="num" style="color:var(--fade)">4</div>
+        <div class="info">
+          <span class="name">External Memory</span>
+          <span class="tool">NotebookLM, Copilot, Antigravity</span>
+          <span class="desc">Memory outside the context window. Token-free persistent retrieval.</span>
+          <span class="scale">Scale: unbounded</span>
+        </div>
+      </div>
+      <div class="stack-layer" data-layer="5" style="transition-delay:0.4s">
+        <div class="num" style="color:var(--layer5)">5</div>
+        <div class="info">
+          <span class="name">Self-Designed Memory</span>
+          <span class="tool">Meta-learning (Jeff Clune, Memento)</span>
+          <span class="desc">Agents design their own memory mechanisms. The ultimate moat.</span>
+          <span class="scale">Scale: unknown — research frontier</span>
+        </div>
+      </div>
+    </div>
+
+    <p>
+      <strong>Layer 1</strong> gives you basic continuity — the agent starts primed instead of cold. But at ~100 files
+      it breaks. MEMORY.md becomes "broken by default" — massive, duplicate-heavy, hours to curate.
+    </p>
+    <p>
+      <strong>Layer 2</strong> makes knowledge compound. Article 1 creates 10 pages. Article 50 creates pages that
+      link back to article 1's concepts. At ~500K words, markdown indexes just work. Karpathy himself
+      expected to need fancy RAG and didn't.
+    </p>
+    <p>
+      <strong>Layer 3</strong> is for when wiki alone breaks. GBrain's hybrid retrieval fans out across pgvector HNSW,
+      Postgres tsvector, and Reciprocal Rank Fusion. It ships with an eval harness — P@k, Recall@k, MRR, nDCG@k —
+      while most memory systems have no measurable quality bar.
+    </p>
+    <p>
+      <strong>Layer 4</strong> moves memory outside the context window entirely. NotebookLM bridge: upload your wiki,
+      get 300 free sources, no token cost. The session effectively never ends — it just moves to a cheaper substrate.
+    </p>
+    <p>
+      <strong>Layer 5</strong> is where agents design their own memory. Human-designed schemas are fine for year one.
+      But an agent that discovers its own retrieval patterns — optimized for access you didn't predict —
+      builds a moat that's impossible to replicate by copying the corpus.
+    </p>
+  </section>
+
+  <!-- ━━━ PULLQUOTE 2: kevinnguyendn ━━━ -->
+  <div class="pullquote">
+    <p>"MEMORY.md is broken by default — massive files, duplicate-heavy generation, hours wasted curating."</p>
+    <cite>— kevinnguyendn · 2,240 likes · on the memory skill that hit 26K users in one week</cite>
+  </div>
+
+  <!-- ━━━ RAG vs WIKI ━━━ -->
+  <section id="rag-decision">
+    <h2>RAG vs Wiki: The Decision</h2>
+    <p>
+      The most common question in the memory stack, and the answer is simpler than the debate suggests.
+      Start with the wiki. Add retrieval when you hit the ceiling. Most people over-engineer from day one —
+      building RAG pipelines for 50 documents when grep would have been fine for two years.
+    </p>
+
+    <div class="rag-matrix" id="rag-viz">
+      <div class="rag-row header">
+        <div class="rag-cell">Corpus</div>
+        <div class="rag-cell">Recommendation</div>
+        <div class="rag-cell why-cell">Why</div>
+      </div>
+      <div class="rag-row" data-tip="No infrastructure needed. Markdown indexes just work.">
+        <div class="rag-cell size"><span class="zone" style="background:var(--cool)"></span>&lt; 100</div>
+        <div class="rag-cell rec">Structured wiki</div>
+        <div class="rag-cell why-cell">Indexes just work. No infra needed</div>
+      </div>
+      <div class="rag-row" data-tip="Add BM25 or grep for search. Still no vector DB required.">
+        <div class="rag-cell size"><span class="zone" style="background:var(--grow)"></span>100–1K</div>
+        <div class="rag-cell rec">Wiki + full-text search</div>
+        <div class="rag-cell why-cell">Add BM25 or grep, not vectors</div>
+      </div>
+      <div class="rag-row" data-tip="Need vector + full-text + ranking. GBrain is the reference implementation.">
+        <div class="rag-cell size"><span class="zone" style="background:var(--accent)"></span>1K–10K</div>
+        <div class="rag-cell rec">Hybrid (GBrain)</div>
+        <div class="rag-cell why-cell">Need vector + full-text + ranking</div>
+      </div>
+      <div class="rag-row" data-tip="Embedding-based retrieval is the only option at this scale.">
+        <div class="rag-cell size"><span class="zone" style="background:var(--fade)"></span>10K+</div>
+        <div class="rag-cell rec">Full RAG pipeline</div>
+        <div class="rag-cell why-cell">Embedding retrieval at scale</div>
+      </div>
+      <div class="rag-row" data-tip="Offload to NotebookLM — 300 free sources, no token cost for storage.">
+        <div class="rag-cell size"><span class="zone" style="background:var(--layer5)"></span>Real-time</div>
+        <div class="rag-cell rec">NotebookLM bridge</div>
+        <div class="rag-cell why-cell">Offload to free external RAG</div>
+      </div>
+    </div>
+
+    <p>
+      The "BS on vector search" position (micLivs, 488 likes): for well-structured vaults, classical text
+      retrieval outperforms vector search. The organization IS the retrieval strategy. Vector search is
+      for when you don't have structure — and the whole point of the memory stack is to create structure.
+    </p>
+  </section>
+
+  <!-- ━━━ MOAT ━━━ -->
+  <section id="moat">
+    <h2>Memory as Moat</h2>
+    <p>
+      All five layers serve the same strategic purpose: accumulated context becomes a competitive advantage
+      that can't be cloned. The math is brutal in your favor — replication cost grows superlinearly with
+      corpus age.
+    </p>
+    <div class="viz">
+      <svg id="moat-viz" viewBox="0 0 900 400" aria-label="Moat compounding curve: replication cost over time"></svg>
+      <div class="caption">
+        Replication cost vs. time. By day 365, a competitor cloning your corpus gets a version that's months
+        stale. The cross-links, decision traces, and agent-evolved patterns can't be copied at all.
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ PULLQUOTE 3: rohit4verse ━━━ -->
+  <div class="pullquote">
+    <p>"Memory can be a real moat. The dream cycle at 3am — a nightly job that re-reads activity, extracts patterns, rewrites skills while you sleep."</p>
+    <cite>— rohit4verse (LangChain co-founder) · 164 likes</cite>
+  </div>
+
+  <!-- ━━━ SOURCES ━━━ -->
+  <section id="sources">
+    <h2>Source Landscape</h2>
+    <p>
+      19 sources spanning two orders of magnitude in engagement, from 164 to 55,313 likes.
+      Colored by stack layer — showing where the conversation clusters.
+    </p>
+    <div class="viz">
+      <svg id="sources-viz" viewBox="0 0 900 620" aria-label="Source engagement horizontal bars"></svg>
+      <div class="caption">
+        Log scale. Bar color maps to stack layer:
+        <strong style="color:var(--accent)">L1 Flat Files</strong> ·
+        <strong style="color:var(--cool)">L2 Wiki</strong> ·
+        <strong style="color:var(--grow)">L3 Retrieval</strong> ·
+        <strong style="color:var(--fade)">L4 External</strong> ·
+        <strong style="color:var(--layer5)">L5 Self-Designed</strong>.
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ MATURITY ━━━ -->
+  <section id="maturity">
+    <h2>The Maturity Ladder</h2>
+    <p>
+      Eight levels from stateless to self-designed. Most practitioners are at level 1–3.
+      The 10x users are at 4–5. Level 7 glows differently — research, not production. Yet.
+    </p>
+
+    <div class="ladder" id="ladder-viz">
+      <div class="ladder-step" data-level="0">
+        <div class="lvl" style="color:var(--stop)">0</div>
+        <div class="approach">Stateless</div>
+        <div class="scope">None</div>
+        <div class="cont">Zero</div>
+      </div>
+      <div class="ladder-step" data-level="1">
+        <div class="lvl" style="color:var(--accent)">1</div>
+        <div class="approach">CLAUDE.md</div>
+        <div class="scope">Per project</div>
+        <div class="cont">Static</div>
+      </div>
+      <div class="ladder-step" data-level="2">
+        <div class="lvl" style="color:var(--accent)">2</div>
+        <div class="approach">HANDOVER.md</div>
+        <div class="scope">Session → session</div>
+        <div class="cont">Manual</div>
+      </div>
+      <div class="marker most">Most practitioners are here (Level 1–3)</div>
+      <div class="ladder-step" data-level="3">
+        <div class="lvl" style="color:var(--accent)">3</div>
+        <div class="approach">Auto-memory</div>
+        <div class="scope">Project-scope</div>
+        <div class="cont">Automatic</div>
+      </div>
+      <div class="ladder-step" data-level="4">
+        <div class="lvl" style="color:var(--cool)">4</div>
+        <div class="approach">Structured wiki</div>
+        <div class="scope">~1,000 pages</div>
+        <div class="cont">Compounding</div>
+      </div>
+      <div class="marker tenx">10x users live here (Level 4–5)</div>
+      <div class="ladder-step" data-level="5">
+        <div class="lvl" style="color:var(--grow)">5</div>
+        <div class="approach">Hybrid retrieval</div>
+        <div class="scope">10,000+ docs</div>
+        <div class="cont">Scale-proof</div>
+      </div>
+      <div class="ladder-step" data-level="6">
+        <div class="lvl" style="color:var(--fade)">6</div>
+        <div class="approach">External layers</div>
+        <div class="scope">Unbounded</div>
+        <div class="cont">Token-free</div>
+      </div>
+      <div class="marker research">Research frontier — not production yet</div>
+      <div class="ladder-step glow" data-level="7">
+        <div class="lvl" style="color:var(--layer5)">7</div>
+        <div class="approach">Self-designed memory</div>
+        <div class="scope">Unknown</div>
+        <div class="cont">Recursive</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ━━━ CONVERGENCE ━━━ -->
+  <section id="convergence">
+    <h2>What's Next: Three Convergence Points</h2>
+    <p>
+      The trajectory is clear. Memory is moving from "something you build" to "something the platform provides."
+      The question is whether you'll be ahead of that curve or catching up to it.
+    </p>
+    <div class="actions">
+      <div class="col immediate">
+        <h3>Memory becomes infrastructure</h3>
+        <div class="card">
+          <div class="title">Auto-memory, Copilot memory, Antigravity Knowledge Items</div>
+          <div class="why">Within a year, every major coding agent ships cross-session memory as default, not add-on. Build your stack now while it's still a differentiator.</div>
+        </div>
+      </div>
+      <div class="col watch">
+        <h3>Dream cycle becomes standard</h3>
+        <div class="card">
+          <div class="title">Nightly jobs that re-read, extract patterns, rewrite skills</div>
+          <div class="why">The LangChain co-founder's "dream cycle at 3am" is the natural extension of /loop and /schedule. Expect this as a first-class feature soon.</div>
+        </div>
+      </div>
+      <div class="col skip">
+        <h3>Self-designed memory wins</h3>
+        <div class="card">
+          <div class="title">Agents that discover their own retrieval patterns</div>
+          <div class="why">Early research (Jeff Clune, Memento) but directionally the most important. The best memory system is the one the agent designed for itself.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      Narration of <a href="../report/agent-memory-stack.md">agent-memory-stack.md</a>
+      · rendered by <code>/kb-narration</code> · d3 v7<br>
+      Use <span class="kbd">j</span> <span class="kbd">k</span> or <span class="kbd">↓</span> <span class="kbd">↑</span> to move between sections.
+    </p>
+  </footer>
+</main>
+
+<script>
+/* ────────────────────────────────────────────────────────────────
+ * DATA
+ * ──────────────────────────────────────────────────────────────── */
+const DATA = {
+  sources: [
+    { name: 'Karpathy — LLM Knowledge Bases', likes: 55313, layer: 2 },
+    { name: 'Claude auto-memory launch', likes: 15845, layer: 1 },
+    { name: 'Claude Code memory architecture', likes: 6298, layer: 1 },
+    { name: 'Garry Tan — GBrain launch', likes: 5752, layer: 3 },
+    { name: 'NotebookLM bridge', likes: 5368, layer: 4 },
+    { name: 'Antigravity cross-workspace', likes: 3010, layer: 4 },
+    { name: 'Vtrivedy10 — bitter lesson', likes: 2539, layer: 1 },
+    { name: 'kevinnguyendn — MEMORY.md broken', likes: 2240, layer: 1 },
+    { name: 'Jeff Clune — meta-learning', likes: 1321, layer: 5 },
+    { name: 'GitHub Copilot memory', likes: 899, layer: 4 },
+    { name: 'Jerry Liu — filesystem + grep', likes: 781, layer: 3 },
+    { name: 'Pamela Fox — Copilot engineering', likes: 674, layer: 4 },
+    { name: 'Letta AI — Context Repositories', likes: 636, layer: 3 },
+    { name: 'Shengran Hu — memory challenge', likes: 513, layer: 5 },
+    { name: 'micLivs — BS on vector search', likes: 488, layer: 3 },
+    { name: 'Elvis — 1,107 files, scale ceiling', likes: 285, layer: 2 },
+    { name: 'shannholmberg — 230-page wiki', likes: 265, layer: 2 },
+    { name: 'alexhillman — session data Postgres', likes: 253, layer: 3 },
+    { name: 'rohit4verse — dream cycle', likes: 164, layer: 2 },
+  ],
+  moat: [
+    { day: 1,   pages: 1,   links: 0,     replicate: 'Instant',           replicateDays: 0.01 },
+    { day: 30,  pages: 30,  links: 150,   replicate: 'A weekend',         replicateDays: 2 },
+    { day: 180, pages: 300, links: 3000,  replicate: '2 weeks',           replicateDays: 14 },
+    { day: 365, pages: 600, links: 12000, replicate: 'Months (and stale)', replicateDays: 120 },
+  ],
+  layerColors: {
+    1: 'var(--accent)',
+    2: 'var(--cool)',
+    3: 'var(--grow)',
+    4: 'var(--fade)',
+    5: 'var(--layer5)',
+  },
+  heroMetrics: ['MEMORY.md', '~100 files', '~1K pages', '~10K docs', '∞'],
+};
+
+/* ────────────────────────────────────────────────────────────────
+ * SHARED HELPERS
+ * ──────────────────────────────────────────────────────────────── */
+const layerColorMap = { 1: '--accent', 2: '--cool', 3: '--grow', 4: '--fade', 5: '--layer5' };
+function getColor(layer) {
+  const style = getComputedStyle(document.documentElement);
+  return style.getPropertyValue(layerColorMap[layer]).trim();
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * VIZ: Hero — Amnesia Loop → Stack Fix
+ * ──────────────────────────────────────────────────────────────── */
+function drawHero() {
+  const svg = d3.select('#hero-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 420;
+  const barX = 100, barY = 60, barW = 700, barH = 36;
+
+  // Background label
+  svg.append('text').attr('x', W/2).attr('y', 30)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--fg-dim)')
+    .attr('font-size', '13px').attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('CONTEXT WINDOW');
+
+  // Bar background
+  svg.append('rect').attr('x', barX).attr('y', barY)
+    .attr('width', barW).attr('height', barH).attr('rx', 6)
+    .attr('fill', 'var(--bg-hi)').attr('stroke', 'var(--border)');
+
+  // Context fill bar
+  const fillBar = svg.append('rect').attr('x', barX).attr('y', barY)
+    .attr('width', 0).attr('height', barH).attr('rx', 6)
+    .attr('fill', 'var(--grow)').attr('fill-opacity', 0.5);
+
+  // Flash overlay for reset
+  const flashRect = svg.append('rect').attr('x', barX).attr('y', barY)
+    .attr('width', barW).attr('height', barH).attr('rx', 6)
+    .attr('fill', 'var(--fade)').attr('opacity', 0);
+
+  // Status text
+  const statusText = svg.append('text').attr('x', W/2).attr('y', barY + barH + 30)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--fg-mid)')
+    .attr('font-size', '14px').attr('font-family', '-apple-system, system-ui, sans-serif');
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dur = reduced ? 1 : 600;
+  const pause = reduced ? 1 : 300;
+
+  function amnesiaLoop(cycle, cb) {
+    statusText.text('Session ' + (cycle + 1) + ': learning...');
+    fillBar.transition().duration(dur * 2).attr('width', barW)
+      .on('end', () => {
+        statusText.text('Session end. Resetting.');
+        flashRect.transition().duration(dur / 3).attr('opacity', 0.6)
+          .transition().duration(dur / 2).attr('opacity', 0);
+        fillBar.transition().delay(pause / 2).duration(dur / 2).attr('width', 0)
+          .on('end', () => { setTimeout(cb, pause); });
+      });
+  }
+
+  function runLoop(i) {
+    if (i < 3) {
+      amnesiaLoop(i, () => runLoop(i + 1));
+    } else {
+      drawStackLayers(svg, W, H, barX, barY, barH, statusText, fillBar);
+    }
+  }
+
+  runLoop(0);
+}
+
+function drawStackLayers(svg, W, H, barX, barY, barH, statusText, fillBar) {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dur = reduced ? 1 : 500;
+  statusText.text('');
+
+  // Fill bar stays full
+  fillBar.transition().duration(dur).attr('width', 700);
+
+  const layerNames = ['Flat Files', 'Structured Wiki', 'Hybrid Retrieval', 'External Memory', 'Self-Designed'];
+  const layerKeys = [1, 2, 3, 4, 5];
+  const stackY = barY + barH + 50;
+  const layerH = 44;
+  const gap = 4;
+
+  layerKeys.forEach((lk, i) => {
+    const y = stackY + (4 - i) * (layerH + gap);
+    const g = svg.append('g').attr('opacity', 0);
+
+    g.append('rect')
+      .attr('x', barX).attr('y', y)
+      .attr('width', 700).attr('height', layerH).attr('rx', 6)
+      .attr('fill', DATA.layerColors[lk]).attr('fill-opacity', 0.15)
+      .attr('stroke', DATA.layerColors[lk]).attr('stroke-opacity', 0.6);
+
+    g.append('text')
+      .attr('x', barX + 16).attr('y', y + layerH / 2 + 1)
+      .attr('dominant-baseline', 'middle')
+      .attr('fill', DATA.layerColors[lk])
+      .attr('font-size', '14px').attr('font-weight', '600')
+      .attr('font-family', '-apple-system, system-ui, sans-serif')
+      .text('L' + lk + ' — ' + layerNames[i]);
+
+    g.append('text')
+      .attr('x', barX + 700 - 16).attr('y', y + layerH / 2 + 1)
+      .attr('dominant-baseline', 'middle').attr('text-anchor', 'end')
+      .attr('fill', DATA.layerColors[lk]).attr('fill-opacity', 0.7)
+      .attr('font-size', '13px')
+      .attr('font-family', '"JetBrains Mono", "SF Mono", ui-monospace, monospace')
+      .text(DATA.heroMetrics[i]);
+
+    g.transition().delay(i * (reduced ? 10 : 250)).duration(dur)
+      .attr('opacity', 1);
+  });
+
+  // Hero stat callout
+  const statG = svg.append('g').attr('opacity', 0);
+  statG.append('text')
+    .attr('x', W / 2).attr('y', H - 20)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--accent)')
+    .attr('font-family', '"Source Serif 4", "Iowan Old Style", Charter, Georgia, serif')
+    .attr('font-size', '44px').attr('font-weight', '600')
+    .text('5 layers');
+  statG.transition().delay(reduced ? 50 : 1400).duration(dur).attr('opacity', 1);
+}
+
+function replayStackLighting() {
+  const svg = d3.select('#hero-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 420;
+
+  const layerNames = ['Flat Files', 'Structured Wiki', 'Hybrid Retrieval', 'External Memory', 'Self-Designed'];
+  const layerKeys = [1, 2, 3, 4, 5];
+  const layerH = 52, gap = 6;
+  const startY = 40;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dur = reduced ? 1 : 400;
+
+  layerKeys.forEach((lk, i) => {
+    const y = startY + (4 - i) * (layerH + gap);
+    const g = svg.append('g').attr('opacity', 0);
+
+    g.append('rect')
+      .attr('x', 100).attr('y', y)
+      .attr('width', 700).attr('height', layerH).attr('rx', 8)
+      .attr('fill', DATA.layerColors[lk]).attr('fill-opacity', 0.08)
+      .attr('stroke', DATA.layerColors[lk]).attr('stroke-opacity', 0.3);
+
+    g.append('text')
+      .attr('x', 130).attr('y', y + layerH / 2 + 1)
+      .attr('dominant-baseline', 'middle')
+      .attr('fill', DATA.layerColors[lk])
+      .attr('font-size', '16px').attr('font-weight', '600')
+      .attr('font-family', '"Source Serif 4", serif')
+      .text('Layer ' + lk + ': ' + layerNames[i]);
+
+    g.append('text')
+      .attr('x', 770).attr('y', y + layerH / 2 + 1)
+      .attr('dominant-baseline', 'middle').attr('text-anchor', 'end')
+      .attr('fill', DATA.layerColors[lk])
+      .attr('font-size', '15px')
+      .attr('font-family', '"JetBrains Mono", "SF Mono", ui-monospace, monospace')
+      .text(DATA.heroMetrics[i]);
+
+    // Light up sequence
+    g.transition().delay(i * (reduced ? 10 : 350)).duration(dur).attr('opacity', 1);
+    g.select('rect').transition().delay(i * (reduced ? 10 : 350)).duration(dur)
+      .attr('fill-opacity', 0.25).attr('stroke-opacity', 1)
+      .transition().duration(dur * 2)
+      .attr('fill-opacity', 0.12).attr('stroke-opacity', 0.6);
+  });
+
+  // Final glow stat
+  const statG = svg.append('g').attr('opacity', 0);
+  statG.append('text')
+    .attr('x', W / 2).attr('y', H - 30)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--accent)')
+    .attr('font-family', '"Source Serif 4", "Iowan Old Style", Charter, Georgia, serif')
+    .attr('font-size', '44px').attr('font-weight', '600')
+    .text('5 layers');
+  statG.append('text')
+    .attr('x', W / 2).attr('y', H - 5)
+    .attr('text-anchor', 'middle')
+    .attr('fill', 'var(--fg-dim)')
+    .attr('font-size', '13px')
+    .attr('font-family', '-apple-system, system-ui, sans-serif')
+    .text('from flat files to self-designed memory');
+  statG.transition().delay(reduced ? 50 : 1900).duration(dur).attr('opacity', 1);
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * VIZ: Moat Compounding Curve
+ * ──────────────────────────────────────────────────────────────── */
+function drawMoat() {
+  const svg = d3.select('#moat-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 400;
+  const m = { top: 40, right: 60, bottom: 60, left: 80 };
+  const iw = W - m.left - m.right, ih = H - m.top - m.bottom;
+  const g = svg.append('g').attr('transform', 'translate(' + m.left + ',' + m.top + ')');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const data = DATA.moat;
+  const x = d3.scaleLinear().domain([0, 400]).range([0, iw]);
+  const y = d3.scaleLinear().domain([0, 140]).range([ih, 0]);
+
+  // Grid
+  [0, 100, 200, 300, 400].forEach(v => {
+    g.append('line').attr('x1', x(v)).attr('x2', x(v)).attr('y1', 0).attr('y2', ih)
+      .attr('stroke', 'var(--border)').attr('stroke-dasharray', '3,4');
+  });
+  [0, 30, 60, 90, 120].forEach(v => {
+    g.append('line').attr('x1', 0).attr('x2', iw).attr('y1', y(v)).attr('y2', y(v))
+      .attr('stroke', 'var(--border)').attr('stroke-dasharray', '3,4');
+  });
+
+  // Axes labels
+  svg.append('text').attr('x', W / 2).attr('y', H - 8)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--fg-dim)').attr('font-size', '12px')
+    .text('Days of accumulated memory');
+  svg.append('text').attr('x', 14).attr('y', H / 2)
+    .attr('text-anchor', 'middle').attr('fill', 'var(--fg-dim)').attr('font-size', '12px')
+    .attr('transform', 'rotate(-90, 14, ' + H / 2 + ')')
+    .text('Days to replicate');
+
+  // Smooth curve through data points
+  const line = d3.line()
+    .x(d => x(d.day))
+    .y(d => y(d.replicateDays))
+    .curve(d3.curveMonotoneX);
+
+  const path = g.append('path').datum(data)
+    .attr('d', line)
+    .attr('fill', 'none')
+    .attr('stroke', 'var(--accent)')
+    .attr('stroke-width', 2.5);
+
+  if (!reduced) {
+    const totalLen = path.node().getTotalLength();
+    path.attr('stroke-dasharray', totalLen)
+      .attr('stroke-dashoffset', totalLen)
+      .transition().duration(1800).ease(d3.easeCubicOut)
+      .attr('stroke-dashoffset', 0);
+  }
+
+  // Area fill
+  const area = d3.area()
+    .x(d => x(d.day)).y0(ih).y1(d => y(d.replicateDays))
+    .curve(d3.curveMonotoneX);
+  g.append('path').datum(data)
+    .attr('d', area)
+    .attr('fill', 'var(--accent)').attr('fill-opacity', 0)
+    .transition().delay(reduced ? 0 : 1200).duration(reduced ? 1 : 800)
+    .attr('fill-opacity', 0.08);
+
+  // Data points + annotations
+  data.forEach((d, i) => {
+    const cx = x(d.day), cy = y(d.replicateDays);
+    const dot = g.append('circle')
+      .attr('cx', cx).attr('cy', cy).attr('r', 0)
+      .attr('fill', 'var(--accent)').attr('stroke', 'var(--bg)').attr('stroke-width', 2);
+    dot.transition().delay(reduced ? 0 : 400 + i * 400).duration(reduced ? 1 : 300).attr('r', 6);
+
+    const label = g.append('g').attr('opacity', 0);
+    const ly = i < 2 ? cy - 20 : cy - 24;
+    label.append('text')
+      .attr('x', cx).attr('y', ly)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--fg)')
+      .attr('font-size', '13px').attr('font-weight', '600')
+      .text(d.replicate);
+    label.append('text')
+      .attr('x', cx).attr('y', ly + 16)
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--fg-dim)')
+      .attr('font-size', '11px')
+      .text('Day ' + d.day + ' · ' + d.pages + ' pages');
+    label.transition().delay(reduced ? 0 : 600 + i * 400).duration(reduced ? 1 : 400).attr('opacity', 1);
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * VIZ: Source Engagement Bars
+ * ──────────────────────────────────────────────────────────────── */
+function drawSources() {
+  const svg = d3.select('#sources-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 620;
+  const m = { top: 10, right: 80, bottom: 30, left: 260 };
+  const iw = W - m.left - m.right, ih = H - m.top - m.bottom;
+  const g = svg.append('g').attr('transform', 'translate(' + m.left + ',' + m.top + ')');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const data = DATA.sources.slice().sort((a, b) => a.likes - b.likes);
+  const x = d3.scaleLog().domain([100, 80000]).range([0, iw]);
+  const y = d3.scaleBand().domain(data.map(d => d.name)).range([ih, 0]).padding(0.22);
+
+  // Grid lines
+  [100, 500, 1000, 5000, 10000, 50000].forEach(v => {
+    g.append('line').attr('x1', x(v)).attr('x2', x(v)).attr('y1', 0).attr('y2', ih)
+      .attr('stroke', 'var(--border)').attr('stroke-dasharray', '2,4');
+    g.append('text').attr('x', x(v)).attr('y', ih + 18)
+      .attr('text-anchor', 'middle').attr('fill', 'var(--fg-dim)').attr('font-size', '11px')
+      .text(v >= 1000 ? (v / 1000) + 'k' : v);
+  });
+
+  // Bars
+  data.forEach((d, i) => {
+    const barG = g.append('g');
+    barG.append('rect')
+      .attr('x', 0).attr('y', y(d.name))
+      .attr('height', y.bandwidth())
+      .attr('width', 0)
+      .attr('fill', DATA.layerColors[d.layer]).attr('fill-opacity', 0.2)
+      .attr('stroke', DATA.layerColors[d.layer]).attr('stroke-opacity', 0.7)
+      .attr('rx', 3)
+      .transition().delay(reduced ? 0 : i * 50).duration(reduced ? 1 : 600)
+      .attr('width', x(d.likes));
+
+    // Label
+    barG.append('text')
+      .attr('x', -8).attr('y', y(d.name) + y.bandwidth() / 2 + 1)
+      .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
+      .attr('fill', 'var(--fg-mid)').attr('font-size', '11.5px')
+      .text(d.name);
+
+    // Value
+    const valText = barG.append('text')
+      .attr('x', x(d.likes) + 6).attr('y', y(d.name) + y.bandwidth() / 2 + 1)
+      .attr('dominant-baseline', 'middle')
+      .attr('fill', DATA.layerColors[d.layer]).attr('font-size', '11px')
+      .attr('font-family', '"JetBrains Mono", ui-monospace, monospace')
+      .attr('opacity', 0)
+      .text(d.likes >= 1000 ? (d.likes / 1000).toFixed(1) + 'k' : d.likes);
+    valText.transition().delay(reduced ? 0 : i * 50 + 400).duration(reduced ? 1 : 300).attr('opacity', 1);
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * STACK LAYER SCROLL ANIMATION
+ * ──────────────────────────────────────────────────────────────── */
+function animateStackLayers() {
+  document.querySelectorAll('.stack-layer').forEach((el, i) => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setTimeout(() => el.classList.add('visible'), reduced ? 0 : i * 120);
+  });
+}
+
+/* ────────────────────────────────────────────────────────────────
+ * CHROME — MANDATORY
+ * ──────────────────────────────────────────────────────────────── */
+
+// Pay-off moment: click "5 layers" stat
+document.getElementById('stat-hero').addEventListener('click', replayStackLighting);
+
+// Stack layer click → scroll to stack section detail
+document.querySelectorAll('.stack-layer').forEach(el => {
+  el.addEventListener('click', () => {
+    document.getElementById('stack').scrollIntoView({ behavior: 'smooth' });
+  });
+});
+
+// Reading progress
+const progressEl = document.getElementById('progress');
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  progressEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+}, { passive: true });
+
+// Section entry + lazy viz draw
+const vizDrawnOnce = new Set();
+const entryObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('visible');
+    const id = e.target.id;
+    if (id === 'stack' && !vizDrawnOnce.has('stack')) { animateStackLayers(); vizDrawnOnce.add('stack'); }
+    if (id === 'moat' && !vizDrawnOnce.has('moat')) { drawMoat(); vizDrawnOnce.add('moat'); }
+    if (id === 'sources' && !vizDrawnOnce.has('sources')) { drawSources(); vizDrawnOnce.add('sources'); }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -100px 0px' });
+document.querySelectorAll('section').forEach(s => entryObserver.observe(s));
+
+// Hero draws on load
+addEventListener('DOMContentLoaded', () => { drawHero(); });
+
+// Minimap
+const minimapLinks = document.querySelectorAll('#minimap a');
+const activeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      minimapLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -50% 0px' });
+document.querySelectorAll('main > header, main > section').forEach(el => {
+  if (el.id) activeObserver.observe(el);
+});
+
+// Theme toggle
+const themeBtn = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('kb-narration-theme');
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+themeBtn.textContent = document.documentElement.dataset.theme === 'dark' ? '☾' : '☀';
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('kb-narration-theme', next);
+  themeBtn.textContent = next === 'dark' ? '☾' : '☀';
+});
+
+// Keyboard nav
+const sectionIds = ['top', 'stack', 'rag-decision', 'moat', 'sources', 'maturity', 'convergence'];
+addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, button')) return;
+  const vy = document.documentElement.scrollTop + innerHeight * 0.3;
+  let cur = 0;
+  sectionIds.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= vy) cur = i;
+  });
+  let next = cur;
+  if (e.key === 'j' || e.key === 'ArrowDown') next = Math.min(sectionIds.length - 1, cur + 1);
+  else if (e.key === 'k' || e.key === 'ArrowUp') next = Math.max(0, cur - 1);
+  else if (e.key === 'g') next = 0;
+  else if (e.key === 'G') next = sectionIds.length - 1;
+  else return;
+  e.preventDefault();
+  document.getElementById(sectionIds[next]).scrollIntoView({ behavior: 'smooth' });
+});
+
+// Resize redraw
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    drawHero();
+    if (vizDrawnOnce.has('moat')) drawMoat();
+    if (vizDrawnOnce.has('sources')) drawSources();
+  }, 200);
+});
+</script>
+</body>
+</html>
