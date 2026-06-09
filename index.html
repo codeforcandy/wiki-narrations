@@ -197,10 +197,9 @@ footer {
 
 <script>
 // ── password ──────────────────────────────────
-// SHA-256 hash of the password, computed once. The actual password never appears in source.
-const HASH = '4d1608c849f1a4968565d5019e500b9c3541f654c33ac9d096b610d27229499c'; // sha256("candy")
+const HASH = '4d1608c849f1a4968565d5019e500b9c3541f654c33ac9d096b610d27229499c'; 
 
-async function sha256(msg) {
+async function hashStr(msg) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -220,7 +219,7 @@ if (sessionStorage.getItem('wiki-narration-auth') === 'ok') {
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const h = await sha256(pw.value);
+  const h = await hashStr(pw.value);
   if (h === HASH) {
     sessionStorage.setItem('wiki-narration-auth', 'ok');
     gate.style.display = 'none';
@@ -236,6 +235,7 @@ form.addEventListener('submit', async (e) => {
 // ── narration registry ────────────────────────
 // Add entries here when publishing new narrations.
 const NARRATIONS = [
+  { file: "songwriting-research-2026-06-08.html", title: "Songwriting \u2014 Comprehensive Research", date: "2026-06-08", desc: "Craft fundamentals, creative process, genre conventions, business mechanics, and modern tooling for songwriting in the streaming era.", tag: "tech" },
   { file: "jackfruit-seed-comparison.html", title: "Jackfruit Seeds \u2014 The Undervalued Seed", date: "2026-04-17", desc: "The lowest-calorie, lowest-fat seed you can eat, with 30% resistant starch no super seed can match \u2014 and most of the world throws them away.", tag: "health" },
   { file: "harness-engineering.html", title: "Harness Engineering", date: "2026-04-16", desc: "The architecture that separates 2x from 100x: thin harness, fat skills, hard enforcement, drift management.", tag: "tech" },
   { file: "agent-memory-stack.html", title: "The Agent Memory Stack", date: "2026-04-16", desc: "5 layers from flat files to self-designed memory. Every session starts from zero \u2014 the memory stack is what makes agents compound.", tag: "tech" },

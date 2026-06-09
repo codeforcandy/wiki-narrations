@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Songwriting — Comprehensive Research</title>
+<meta name="description" content="Craft fundamentals, creative process, genre conventions, business mechanics, and modern tooling for songwriting in the streaming era.">
+<script src="https://unpkg.com/d3@7/dist/d3.min.js" defer></script>
+<style>
+:root {
+  --bg:        oklch(0.15 0.012 35);
+  --bg-elev:   oklch(0.20 0.014 35);
+  --bg-hi:     oklch(0.25 0.016 35);
+  --fg:        oklch(0.96 0.004 35);
+  --fg-mid:    oklch(0.78 0.008 35);
+  --fg-dim:    oklch(0.55 0.010 35);
+  --border:    oklch(0.32 0.012 35);
+  --accent:    oklch(0.78 0.17 55);
+  --cool:      oklch(0.72 0.12 250);
+  --grow:      oklch(0.75 0.14 155);
+  --fade:      oklch(0.68 0.14 25);
+  --stop:      oklch(0.55 0.010 35);
+  --shadow:    0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.28);
+}
+[data-theme="light"] {
+  --bg:      oklch(0.985 0.004 35);
+  --bg-elev: oklch(0.965 0.006 35);
+  --bg-hi:   oklch(0.92 0.008 35);
+  --fg:      oklch(0.20 0.012 35);
+  --fg-mid:  oklch(0.38 0.010 35);
+  --fg-dim:  oklch(0.55 0.010 35);
+  --border:  oklch(0.82 0.006 35);
+  --accent:  oklch(0.58 0.17 50);
+  --cool:    oklch(0.52 0.12 250);
+  --grow:    oklch(0.52 0.14 155);
+  --fade:    oklch(0.55 0.14 25);
+  --stop:    oklch(0.60 0.010 35);
+  --shadow:  0 1px 0 oklch(1 0 0 / 0.8) inset, 0 6px 18px oklch(0 0 0 / 0.08);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+html { scroll-behavior: smooth; }
+body {
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+h1, h2, h3 {
+  font-family: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+  font-weight: 600; line-height: 1.15; letter-spacing: -0.015em; margin: 0 0 0.4em;
+}
+h1 { font-size: clamp(2.2rem, 5.5vw, 3.8rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin-top: 0.2em; }
+h3 { font-size: 1.1rem; color: var(--fg-mid); margin-top: 1.4em; }
+p { margin: 0 0 1em; color: var(--fg-mid); }
+p.lede { font-size: 1.14rem; color: var(--fg); max-width: 62ch; }
+strong { color: var(--fg); font-weight: 600; }
+ul { padding-left: 1.3em; margin: 0 0 1em; }
+li { margin-bottom: 0.35em; color: var(--fg-mid); }
+main { max-width: 980px; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+section { margin: 4.5rem 0; opacity: 0; transform: translateY(20px); transition: opacity 0.9s, transform 0.9s; }
+section.visible { opacity: 1; transform: none; }
+#progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--cool));
+  width: 0%; z-index: 100; transition: width 0.1s linear;
+  box-shadow: 0 0 12px var(--accent);
+}
+#theme-toggle {
+  position: fixed; top: 1.2rem; right: 1.2rem; width: 36px; height: 36px;
+  border-radius: 50%; background: var(--bg-elev); color: var(--fg);
+  border: 1px solid var(--border); font: 16px/1 system-ui; cursor: pointer;
+  z-index: 60; display: grid; place-items: center;
+}
+#theme-toggle:hover { background: var(--bg-hi); transform: rotate(20deg); }
+#minimap {
+  position: fixed; left: max(1rem, calc(50vw - 600px)); top: 50%;
+  transform: translateY(-50%); display: flex; flex-direction: column; gap: 0.5rem; z-index: 50;
+}
+#minimap a {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0.45rem;
+  color: var(--fg-dim); border: none; font-size: 0.76rem; border-radius: 4px;
+  text-decoration: none; white-space: nowrap;
+}
+#minimap a::before {
+  content: ""; width: 14px; height: 2px; background: var(--border);
+  transition: width 0.3s, background 0.3s;
+}
+#minimap a.active { color: var(--accent); }
+#minimap a.active::before { width: 24px; background: var(--accent); }
+@media (max-width: 1200px) { #minimap { display: none; } }
+.hero .date {
+  display: inline-block; font: 600 0.72rem/1 "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);
+  padding: 0.4rem 0.7rem; border: 1px solid oklch(from var(--accent) l c h / 0.4);
+  border-radius: 100px; margin-bottom: 1.4rem;
+}
+.hero .subtitle {
+  font-family: "Source Serif 4", Charter, Georgia, serif;
+  font-style: italic; font-size: 1.2rem; color: var(--fg-mid); max-width: 52ch; margin: 0 0 1.5rem;
+}
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.9rem; margin: 1.5rem 0;
+}
+.stat {
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.2rem; box-shadow: var(--shadow);
+}
+.stat .value {
+  display: block; font-family: "Source Serif 4", Charter, Georgia, serif;
+  font-weight: 600; font-size: 2.2rem; line-height: 1; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.stat .label { display: block; margin-top: 0.4rem; font-size: 0.82rem; color: var(--fg-dim); }
+.stat.accent .value { color: var(--accent); }
+.stat.cool .value { color: var(--cool); }
+.stat.grow .value { color: var(--grow); }
+.pullquote {
+  margin: 2.5rem 0; padding: 1.6rem 2rem 1.6rem 2.2rem;
+  background: linear-gradient(135deg, oklch(from var(--accent) l c h / 0.1), oklch(from var(--accent) l c h / 0.02));
+  border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0;
+  font-family: "Source Serif 4", Charter, Georgia, serif;
+}
+.pullquote p { font-size: 1.3rem; line-height: 1.35; margin: 0; color: var(--fg); font-style: italic; }
+.pullquote cite {
+  display: block; margin-top: 0.8rem; font-style: normal; font-size: 0.8rem;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-dim);
+  font-family: system-ui, sans-serif;
+}
+.viz {
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1.4rem; margin: 1.4rem 0; box-shadow: var(--shadow);
+}
+.viz svg { display: block; width: 100%; height: auto; overflow: visible; }
+.viz .caption { font-size: 0.82rem; color: var(--fg-dim); margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px solid var(--border); }
+.chip {
+  display: inline-block; padding: 0.1em 0.5em; margin: 0 0.2em 0.2em 0;
+  background: oklch(from var(--cool) l c h / 0.12); color: var(--cool);
+  border: 1px solid oklch(from var(--cool) l c h / 0.35); border-radius: 4px;
+  font-size: 0.82em; font-family: system-ui;
+}
+footer { margin-top: 5rem; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--fg-dim); font-size: 0.8rem; text-align: center; }
+.kbd {
+  display: inline-block; padding: 0.1em 0.45em; background: var(--bg-hi);
+  border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
+  font: 600 0.72em/1 "JetBrains Mono", ui-monospace, monospace; color: var(--fg-mid);
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  section { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<button id="theme-toggle" aria-label="Toggle theme" title="Toggle light / dark">☾</button>
+<nav id="minimap" aria-label="Section navigation">
+  <a href="#top">Top</a>
+  <a href="#craft">Craft</a>
+  <a href="#process">Process</a>
+  <a href="#genres">Genres</a>
+  <a href="#business">Business</a>
+  <a href="#tools">Tools</a>
+  <a href="#playbook">Playbook</a>
+</nav>
+<main id="top">
+  <header class="hero">
+    <span class="date">2026-06-08 · Report</span>
+    <h1>Four Layers of the Modern Songwriter</h1>
+    <p class="subtitle">At 0%: craft is learnable. At 50%: platform economics rewrite structure. At 100%: business hygiene and sonic identity decide who gets paid.</p>
+    <div class="viz">
+      <svg id="hero-graph" viewBox="0 0 900 420" aria-label="Songwriting concept graph"></svg>
+      <div class="caption">Force-directed map of craft pillars and their connections. Node size reflects centrality in the report.</div>
+    </div>
+    <p class="lede">Songwriting in 2026 is not one skill — it is cognitive craft, emotional engineering, platform awareness, and business hygiene operating at once. This narration walks the full stack: from melodic math and prosody through Nashville rooms, genre DNA, sync economics, and the hybrid AI→DAW pipeline.</p>
+    <div class="stat-grid">
+      <div class="stat accent"><span class="value">7s</span><span class="label">Scroll-stop hook window (TikTok/Reels)</span></div>
+      <div class="stat"><span class="value">50/50</span><span class="label">Writer vs. publisher PRO split (US)</span></div>
+      <div class="stat cool"><span class="value">2:30–3:30</span><span class="label">Playlist single length sweet spot</span></div>
+      <div class="stat grow"><span class="value">I–V–vi–IV</span><span class="label">Axis progression family</span></div>
+    </div>
+  </header>
+
+  <div class="pullquote">
+    <p>"Motion creates e-motion."</p>
+    <cite>— Pat Pattison, prosody framework</cite>
+  </div>
+
+  <section id="craft">
+    <h2>Craft Fundamentals</h2>
+    <p>Commercial songs still run on <strong>functional sections</strong> — intro, verse, pre-chorus, chorus, bridge, outro — each with an emotional job. Streaming compressed intros and front-loaded hooks, but contrast between sections remains the fundamental move.</p>
+    <p><span class="chip">ABABCB</span> <span class="chip">Melodic Math</span> <span class="chip">Gap-Fill</span> <span class="chip">Modal Interchange</span> <span class="chip">Dolby Atmos</span></p>
+    <div class="viz">
+      <svg id="chord-viz" viewBox="0 0 900 280" aria-label="Chord progression variants"></svg>
+      <div class="caption">Axis progression (I–V–vi–IV) and borrowed-chord variants. One chromatic substitution per section often refreshes a familiar loop.</div>
+    </div>
+    <h3>Hook Architecture</h3>
+    <ul>
+      <li><strong>Expectation-violation reward</strong> — slight surprise beats perfect predictability</li>
+      <li><strong>Melodic previews</strong> — plant chorus fragments in the verse (Max Martin "glue hooks")</li>
+      <li><strong>Sweet and salt</strong> — busy verse demands sparse chorus (structural symmetry)</li>
+    </ul>
+    <h3>Lyric Craft</h3>
+    <p>Pat Pattison's <strong>stable vs. unstable</strong> framework: perfect rhymes and even line counts signal resolution; slant rhymes and odd line counts signal longing. Match form to emotion. Daily <strong>object writing</strong> (10 min, sensory only) builds image vocabulary and kills cliché.</p>
+  </section>
+
+  <div class="pullquote">
+    <p>"The more constraints one imposes, the more one frees oneself of the chains that shackle the spirit."</p>
+    <cite>— Stravinsky, via lyric constraint research</cite>
+  </div>
+
+  <section id="process">
+    <h2>The Creative Process</h2>
+    <p>Professionals treat writing as <strong>scheduled craft</strong>, not inspiration. Six entry points: title, chorus/hook, melody/topline, chord loop, lyric fragment, or named emotional core.</p>
+    <p>Nashville co-writing runs on the <strong>"No Free Zone"</strong> — no criticizing ideas during generation. Equal splits are convention but increasingly contested when track-builders request 50% before topline. Negotiate upfront; sign split sheets before leaving the room.</p>
+    <ul>
+      <li><strong>Write for the trash can</strong> — separate drafting from editing (St. Vincent)</li>
+      <li><strong>Capture everything</strong> — voice memos, titles, overheard lines</li>
+      <li><strong>Co-write</strong> — accountability and fresh perspective</li>
+      <li><strong>Walk when stuck</strong> — Clay Mills: physical movement unlocks flow</li>
+    </ul>
+  </section>
+
+  <section id="genres">
+    <h2>Genre Conventions</h2>
+    <p>Genres blend faster than ever, but priorities diverge. Pop chases instant hooks; country chases narrative; R&B chases groove and melisma; folk chases lyric-melody marriage; indie chases confessional intimacy.</p>
+    <p><strong>Global models:</strong> K-Pop stacks contrasting sections (maximalist sectionalism). Afrobeats builds on rhythmic cycle before chord change.</p>
+    <div class="viz">
+      <svg id="genre-radar" viewBox="0 0 900 420" aria-label="Genre comparison radar chart"></svg>
+      <div class="caption">Radar comparison on hook immediacy, narrative density, melodic ornament, production polish, and bridge usage (0–10 scale, report synthesis).</div>
+    </div>
+  </section>
+
+  <div class="pullquote">
+    <p>"If the first verse is super-busy, a lot of words, maybe the next part should be the complete opposite, with long notes."</p>
+    <cite>— Max Martin, 2019 Telegraph interview</cite>
+  </div>
+
+  <section id="business">
+    <h2>The Business Side</h2>
+    <p>Every song has <strong>two copyrights</strong>: composition (publishing) and master (recording). Sync requires clearing both unless a one-stop shop controls both sides.</p>
+    <div class="stat-grid">
+      <div class="stat accent"><span class="value">75/25</span><span class="label">Typical co-pub split (writer-favored)</span></div>
+      <div class="stat"><span class="value">10–25%</span><span class="label">Admin deal fee (publisher share)</span></div>
+      <div class="stat cool"><span class="value">$500–5K</span><span class="label">Indie film sync range</span></div>
+      <div class="stat grow"><span class="value">$10K–250K+</span><span class="label">National ad sync range</span></div>
+    </div>
+    <p><strong>Micro-sync</strong> via creator UGC (TikTok, YouTube, Instagram) often beats flagship TV/film for indie passive income. Relationship-first pitching through NSAI, SongU, and PRO workshops beats cold submissions.</p>
+  </section>
+
+  <section id="tools">
+    <h2>Modern Tools &amp; Workflows</h2>
+    <p>The 2026 standard is a <strong>hybrid pipeline</strong>: voice memo → AI or DAW rough demo → DAW polish → collab feedback → pitch-ready assets.</p>
+    <ul>
+      <li><strong>DAWs:</strong> Logic Pro (songwriters), Ableton (loops), BandLab (mobile/cloud)</li>
+      <li><strong>AI:</strong> Suno/Udio for references; ChatGPT/Claude for lyric brainstorming</li>
+      <li><strong>Collab:</strong> Soundtrap, Zoundroom, LANDR Collab, DISCO for pitching</li>
+    </ul>
+    <p>Maintain an <strong>AI disclosure log</strong> for copyright registration. Use the <strong>sonic identity test</strong>: acoustic for folk/country; timbre/rhythm DNA for electronic and hyperpop.</p>
+  </section>
+
+  <div class="pullquote">
+    <p>"There is no writer's block for writers whose standards are low enough."</p>
+    <cite>— SongTown / Clay Mills tradition</cite>
+  </div>
+
+  <section id="playbook">
+    <h2>Practitioner Playbook</h2>
+    <p><strong>Daily (30 min):</strong> 10 min object writing · capture fragments · finish one section without editing.</p>
+    <p><strong>Weekly:</strong> Chart one hit · constraint rhyme rewrite · contrast audit · co-write worktape.</p>
+    <h3>Pre-Pitch Diagnostic</h3>
+    <ul>
+      <li>Emotional core in one sentence?</li>
+      <li>Title in chorus? Melodic preview in verse?</li>
+      <li>Hook/vibe in first 7–15 seconds?</li>
+      <li>Split sheet signed? Sync instrumentals ready?</li>
+      <li>AI assistance documented?</li>
+    </ul>
+    <p>The integrated mandate: optimize the layer you're weakest in — that gap separates hobbyists from professionals.</p>
+  </section>
+
+  <footer>
+    <p>Narration of <a href="../report/songwriting-research-2026-06-08.md">songwriting-research-2026-06-08.md</a> · reviewed by Gemini · rendered by <code>/kb-narration</code> · d3 v7<br>
+    <span class="kbd">j</span> <span class="kbd">k</span> or <span class="kbd">↑</span> <span class="kbd">↓</span> to navigate sections</p>
+  </footer>
+</main>
+
+<script>
+const DATA = {
+  concepts: [
+    { id: 'hook', label: 'Hook', r: 28 },
+    { id: 'melody', label: 'Melody', r: 26 },
+    { id: 'prosody', label: 'Prosody', r: 24 },
+    { id: 'harmony', label: 'Harmony', r: 22 },
+    { id: 'lyrics', label: 'Lyrics', r: 22 },
+    { id: 'arrange', label: 'Arrangement', r: 20 },
+    { id: 'structure', label: 'Structure', r: 24 },
+    { id: 'cowrite', label: 'Co-Write', r: 18 },
+    { id: 'sync', label: 'Sync', r: 18 },
+    { id: 'platform', label: 'Platform', r: 20 },
+    { id: 'ai', label: 'AI Tools', r: 16 }
+  ],
+  edges: [
+    ['hook','melody'],['hook','structure'],['hook','platform'],
+    ['melody','prosody'],['melody','harmony'],['lyrics','prosody'],
+    ['harmony','arrange'],['structure','arrange'],['cowrite','lyrics'],
+    ['sync','arrange'],['platform','hook'],['ai','melody'],['ai','lyrics']
+  ],
+  chords: [
+    { name: 'I', fn: 'Tonic', col: 'var(--accent)' },
+    { name: 'V', fn: 'Dominant', col: 'var(--cool)' },
+    { name: 'vi', fn: 'Relative min', col: 'var(--grow)' },
+    { name: 'IV', fn: 'Subdominant', col: 'var(--fade)' }
+  ],
+  borrowed: [
+    { prog: ['I','V','vi','iv'], label: 'Borrowed iv' },
+    { prog: ['I','V','bVI','IV'], label: 'bVI color' },
+    { prog: ['I','bVII','IV','I'], label: 'bVII lift' }
+  ],
+  genres: [
+    { id: 'pop', label: 'Pop', values: [9, 4, 3, 9, 3] },
+    { id: 'country', label: 'Country', values: [6, 8, 5, 7, 7] },
+    { id: 'rnb', label: 'R&B', values: [5, 6, 9, 8, 6] },
+    { id: 'folk', label: 'Folk', values: [4, 9, 2, 3, 2] },
+    { id: 'indie', label: 'Indie', values: [5, 8, 4, 4, 5] }
+  ],
+  genreAxes: ['Hook Speed','Narrative','Ornament','Polish','Bridge Use']
+};
+
+const vizDrawnOnce = new Set();
+
+function drawHeroGraph() {
+  const svg = d3.select('#hero-graph');
+  svg.selectAll('*').remove();
+  const W = 900, H = 420;
+  const g = svg.append('g');
+
+  const nodes = DATA.concepts.map(d => ({ ...d }));
+  const links = DATA.edges.map(([s,t]) => ({ source: s, target: t }));
+
+  const color = id => {
+    const m = { hook:'var(--accent)', melody:'var(--cool)', prosody:'var(--grow)', harmony:'var(--fade)', platform:'var(--accent)' };
+    return m[id] || 'var(--fg-dim)';
+  };
+
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(90).strength(0.5))
+    .force('charge', d3.forceManyBody().strength(-320))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collide', d3.forceCollide(d => d.r + 4));
+
+  const link = g.selectAll('line').data(links).join('line')
+    .attr('stroke', 'var(--border)').attr('stroke-width', 1.5).attr('opacity', 0.6);
+
+  const node = g.selectAll('g').data(nodes).join('g').attr('cursor', 'pointer');
+  node.append('circle')
+    .attr('r', 0)
+    .attr('fill', d => color(d.id))
+    .attr('fill-opacity', 0.25)
+    .attr('stroke', d => color(d.id))
+    .attr('stroke-width', 2)
+    .transition().duration(700).delay((_,i) => i*60)
+    .attr('r', d => d.r);
+  node.append('text')
+    .attr('text-anchor', 'middle').attr('dy', '0.35em')
+    .attr('fill', 'var(--fg)').attr('font-size', '11px').attr('font-family', 'system-ui')
+    .text(d => d.label).attr('opacity', 0).transition().delay(400).attr('opacity', 1);
+
+  simulation.on('tick', () => {
+    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+}
+
+function drawChordViz() {
+  const svg = d3.select('#chord-viz');
+  svg.selectAll('*').remove();
+  const W = 900, H = 280;
+  const g = svg.append('g').attr('transform', 'translate(40,30)');
+  const iw = W - 80, ih = H - 60;
+
+  const rows = [
+    { label: 'Axis (I–V–vi–IV)', prog: ['I','V','vi','IV'], y: 0 },
+    ...DATA.borrowed.map((b,i) => ({ label: b.label, prog: b.prog, y: i + 1 }))
+  ];
+
+  const x = d3.scaleBand().domain([0,1,2,3]).range([120, iw]).padding(0.25);
+  const y = d3.scaleBand().domain(rows.map((_,i) => i)).range([0, ih]).padding(0.35);
+
+  rows.forEach((row, ri) => {
+    g.append('text').attr('x', 0).attr('y', y(ri) + y.bandwidth()/2)
+      .attr('dy', '0.35em').attr('fill', 'var(--fg-dim)').attr('font-size', '12px')
+      .text(row.label);
+    row.prog.forEach((ch, ci) => {
+      const base = DATA.chords.find(c => c.name === ch) || { col: 'var(--fg-dim)' };
+      g.append('rect')
+        .attr('x', x(ci)).attr('y', y(ri))
+        .attr('width', 0).attr('height', y.bandwidth())
+        .attr('rx', 6)
+        .attr('fill', base.col).attr('fill-opacity', 0.35)
+        .attr('stroke', base.col)
+        .transition().delay(ri*120 + ci*80).duration(500)
+        .attr('width', x.bandwidth());
+      g.append('text')
+        .attr('x', x(ci) + x.bandwidth()/2).attr('y', y(ri) + y.bandwidth()/2)
+        .attr('text-anchor', 'middle').attr('dy', '0.35em')
+        .attr('fill', 'var(--fg)').attr('font-size', '13px').attr('font-weight', 600)
+        .text(ch).attr('opacity', 0).transition().delay(ri*120 + ci*80 + 200).attr('opacity', 1);
+    });
+  });
+}
+
+function drawGenreRadar() {
+  const svg = d3.select('#genre-radar');
+  svg.selectAll('*').remove();
+  const W = 900, H = 420;
+  const cx = W/2, cy = H/2, r = 140;
+  const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
+  const axes = DATA.genreAxes;
+  const angleSlice = (Math.PI * 2) / axes.length;
+
+  const radarScale = d3.scaleLinear().domain([0, 10]).range([0, r]);
+  const levels = [2, 4, 6, 8, 10];
+  levels.forEach(lv => {
+    g.append('circle').attr('r', radarScale(lv))
+      .attr('fill', 'none').attr('stroke', 'var(--border)').attr('stroke-opacity', 0.5);
+  });
+  axes.forEach((ax, i) => {
+    const a = angleSlice * i - Math.PI/2;
+    g.append('line')
+      .attr('x1', 0).attr('y1', 0)
+      .attr('x2', r * Math.cos(a)).attr('y2', r * Math.sin(a))
+      .attr('stroke', 'var(--border)');
+    g.append('text')
+      .attr('x', (r + 22) * Math.cos(a)).attr('y', (r + 22) * Math.sin(a))
+      .attr('text-anchor', 'middle').attr('dy', '0.35em')
+      .attr('fill', 'var(--fg-dim)').attr('font-size', '11px').text(ax);
+  });
+
+  const colors = ['var(--accent)','var(--cool)','var(--grow)','var(--fade)','var(--fg-mid)'];
+  const lineGen = d3.lineRadial()
+    .radius(d => radarScale(d))
+    .angle((_, i) => i * angleSlice)
+    .curve(d3.curveLinearClosed);
+
+  DATA.genres.forEach((genre, gi) => {
+    const pts = genre.values;
+    const path = g.append('path')
+      .datum(pts)
+      .attr('d', lineGen)
+      .attr('fill', colors[gi]).attr('fill-opacity', 0)
+      .attr('stroke', colors[gi]).attr('stroke-width', 2)
+      .attr('stroke-opacity', 0.85);
+    const len = path.node().getTotalLength();
+    path.attr('stroke-dasharray', `${len} ${len}`)
+      .attr('stroke-dashoffset', len)
+      .transition().delay(gi*200).duration(800)
+      .attr('stroke-dashoffset', 0)
+      .attr('fill-opacity', 0.08);
+  });
+
+  const legend = svg.append('g').attr('transform', `translate(${W - 160}, 30)`);
+  DATA.genres.forEach((genre, i) => {
+    const row = legend.append('g').attr('transform', `translate(0, ${i * 22})`);
+    row.append('rect').attr('width', 12).attr('height', 12).attr('rx', 2)
+      .attr('fill', colors[i]).attr('fill-opacity', 0.5);
+    row.append('text').attr('x', 18).attr('y', 10)
+      .attr('fill', 'var(--fg-mid)').attr('font-size', '12px').text(genre.label);
+  });
+}
+
+const progressEl = document.getElementById('progress');
+addEventListener('scroll', () => {
+  const h = document.documentElement;
+  progressEl.style.width = Math.min(100, (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100) + '%';
+}, { passive: true });
+
+const entryObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('visible');
+    const id = e.target.id;
+    if (id === 'craft' && !vizDrawnOnce.has('chord')) { drawChordViz(); vizDrawnOnce.add('chord'); }
+    if (id === 'genres' && !vizDrawnOnce.has('radar')) { drawGenreRadar(); vizDrawnOnce.add('radar'); }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -100px 0px' });
+document.querySelectorAll('section').forEach(s => entryObserver.observe(s));
+
+addEventListener('DOMContentLoaded', () => { drawHeroGraph(); });
+
+const minimapLinks = document.querySelectorAll('#minimap a');
+const activeObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id || 'top';
+      minimapLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+    }
+  });
+}, { rootMargin: '-40% 0px -50% 0px' });
+document.querySelectorAll('main > header, main > section').forEach(el => activeObserver.observe(el));
+
+const themeBtn = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('kb-narration-theme');
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+themeBtn.textContent = document.documentElement.dataset.theme === 'dark' ? '☾' : '☀';
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('kb-narration-theme', next);
+  themeBtn.textContent = next === 'dark' ? '☾' : '☀';
+});
+
+const sectionIds = ['top','craft','process','genres','business','tools','playbook'];
+addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, button')) return;
+  const vy = document.documentElement.scrollTop + innerHeight * 0.3;
+  let cur = 0;
+  sectionIds.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el && el.offsetTop <= vy) cur = i;
+  });
+  let next = cur;
+  if (e.key === 'j' || e.key === 'ArrowDown') next = Math.min(sectionIds.length - 1, cur + 1);
+  else if (e.key === 'k' || e.key === 'ArrowUp') next = Math.max(0, cur - 1);
+  else if (e.key === 'g') next = 0;
+  else if (e.key === 'G') next = sectionIds.length - 1;
+  else return;
+  e.preventDefault();
+  document.getElementById(sectionIds[next]).scrollIntoView({ behavior: 'smooth' });
+});
+
+let resizeTimer;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    drawHeroGraph();
+    if (vizDrawnOnce.has('chord')) drawChordViz();
+    if (vizDrawnOnce.has('radar')) drawGenreRadar();
+  }, 200);
+});
+</script>
+</body>
+</html>
